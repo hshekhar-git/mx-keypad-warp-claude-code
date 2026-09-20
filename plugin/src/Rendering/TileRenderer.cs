@@ -36,7 +36,8 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public static BitmapImage Session(SessionInfo s, Boolean selected, Boolean flash, PluginImageSize size, Int32 frame)
         {
-            var bg = StateColor(s.State);
+            // Out of usage is its own colour: it is neither an error to fix nor a turn to take.
+            var bg = s.IsLimited ? Amber : StateColor(s.State);
             if (s.State == "attention" && (frame / BlinkFrames) % 2 == 1)
             {
                 bg = Shade(bg, 0.5);
@@ -140,6 +141,11 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static String Status(SessionInfo s)
         {
             var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (s.IsLimited)
+            {
+                return $"limit · {s.Limit}";
+            }
+
             switch (s.State)
             {
                 case "busy":

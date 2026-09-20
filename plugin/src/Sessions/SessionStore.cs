@@ -51,6 +51,12 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         // auto | low | medium | high | xhigh | max
         public String Effort { get; set; } = "auto";
+
+        // When the usage limit this session has hit lifts ("4:40am"); empty when it has not hit one.
+        public String Limit { get; set; } = "";
+
+        // Stopped by the limit rather than working through it at low priority.
+        public Boolean IsLimited => this.Limit.Length > 0 && this.State != "busy";
         public Int64 ContextTokens { get; set; }
         public Int32 ContextWindow { get; set; }
 
@@ -405,6 +411,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 s.ContextTokens = info.ContextTokens;
                 s.Selected = ModelNames.Resolve(info.SwitchedTo, info.Model);
                 s.Effort = info.Effort.Length > 0 ? info.Effort : ModelNames.DefaultEffort;
+                s.Limit = info.Limit;
 
                 // More than 200k tokens in the window settles the question whatever the names say.
                 if (!s.Selected.OneM && s.Selected.IsKnown && info.ContextTokens > 200_000)
@@ -491,6 +498,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     .Append(s.Prompt).Append('\u001f')
                     .Append(s.Here ? '1' : '0').Append('\u001f')
                     .Append(s.Selected.Name).Append(s.Selected.OneM ? "+" : "").Append('\u001f')
+                    .Append(s.Limit).Append('\u001f')
                     .Append(s.Effort).Append('\u001f').Append(s.Mode).Append('\u001f').Append(s.Turns).Append('\u001f')
                     .Append(String.Join(",", s.Options)).Append('\u001f')
                     .Append((Int32)(s.ContextFill * 100)).Append('\u001e');

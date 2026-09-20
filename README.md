@@ -39,6 +39,11 @@ that session's own page:**
 While the session is **blocked**, the answers come first, straight after the tile: **yes / always / no**
 for a permission prompt, the **actual option labels** for a multiple-choice question.
 
+**Out of usage** - when a session hits your usage limit its tile turns **amber** and reads
+`limit · 4:40am` (when it lifts), and its page gains a **continue at low priority** key, which sends
+`/low-priority`. It is read from the transcript: the newest reply being a `rate_limit` error means
+limited; any later reply, or the reset time passing, means not.
+
 - **Everything that can be changed is changed the same way:** tap to step through the choices, ringed
   in white; it is sent once, a second and a half after your last tap. Tapping back round to the value
   in use sends nothing.
@@ -72,6 +77,7 @@ for a permission prompt, the **actual option labels** for a multiple-choice ques
 | green | **done** — your turn, with how long ago | `Stop` |
 | red, blinking | **attention** — blocked on you. A permission prompt shows *the command it wants to run*; `AskUserQuestion` shows "asks you"; `ExitPlanMode` shows "plan ready" | `PermissionRequest`, `Notification`, `PreToolUse` |
 | purple | **error** — the turn died | `StopFailure` |
+| amber | **limit** — out of usage until the time shown | the transcript's `rate_limit` reply |
 | grey | **idle** | `SessionStart` |
 
 
@@ -260,6 +266,20 @@ source env.sh                                                  # points DOTNET_R
 dotnet build plugin/src/ClaudeDeckPlugin.csproj -c Release     # build + link + reload
 hooks/install-hooks.sh                                         # wire the hooks
 ```
+
+## Reaching another keypad profile
+
+Options+ swaps keypad **profiles** by the app in front: a Warp profile while you are in Warp, your
+default profile everywhere else. To get from one to the other by hand - say, to your app-launcher
+profile while Warp is in front - use Options+'s own action, which needs no plugin:
+
+1. Logi Options+ → MX Creative Keypad → pick the profile you want the button **on** (e.g. *Warp*).
+2. In the actions panel search **profile**; the built-in action is described as *"Switches current
+   device profile to selected one"*.
+3. Drag it to a free key and choose the target, e.g. **Default General Profile**.
+
+Alternatively put **App Switcher** (or an **Open App** key) on the Warp profile: this plugin's
+actions work on every profile.
 
 ## Troubleshooting
 

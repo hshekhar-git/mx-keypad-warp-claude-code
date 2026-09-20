@@ -21,6 +21,13 @@ namespace Loupedeck.ClaudeDeckPlugin
         // the session never ran one, in which case it is on the default.
         public String Effort { get; init; } = "";
 
+        // Set while the newest main-thread reply is a usage-limit error: what it said about when the
+        // limit lifts ("4:40am"), and that moment, after which it stops counting.
+        public String LimitLabel { get; init; } = "";
+        public DateTime LimitResetsAt { get; init; } = DateTime.MinValue;
+
+        public String Limit => this.LimitLabel.Length > 0 && DateTime.Now < this.LimitResetsAt ? this.LimitLabel : "";
+
         // Tokens in the context window as of the last main-thread assistant message.
         public Int64 ContextTokens { get; init; }
     }
@@ -128,6 +135,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             var switchedTo = "";
             var modelSettled = false;
             var effort = "";
+            var replySeen = false;
+            var limitLabel = "";
+            var limitResetsAt = DateTime.MinValue;
             Int64 tokens = -1;
 
             // Newest first, stopping as soon as everything has been seen once.
@@ -149,7 +159,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                 var wantsSwitch = !modelSettled
                     && (line.Contains("Set model to", StringComparison.Ordinal) || line.Contains("Kept model as", StringComparison.Ordinal));
                 var wantsEffort = effort.Length == 0 && IsEffortCandidate(line);
-                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch && !wantsEffort)
+                var wantsReply = !replySeen && line.Contains("\"type\":\"assistant\"", StringComparison.Ordinal);
+                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch && !wantsEffort && !wantsReply)
                 {
                     continue;
                 }
@@ -181,6 +192,19 @@ namespace Loupedeck.ClaudeDeckPlugin
                     if (wantsEffort)
                     {
                         effort = EffortFrom(root);
+                    }
+
+                    // Only the NEWEST main-thread reply says whether the session is rate-limited now:
+                    // once Claude has answered again (at low priority, or after the reset) it is not.
+                    if (wantsReply && Str(root, "type") == "assistant"
+                        && !(root.TryGetProperty("isSidechain", out var side) && side.ValueKind == JsonValueKind.True))
+                    {
+                        replySeen = true;
+                        if (Str(root, "error") == "rate_limit"
+                            && root.TryGetProperty("isApiErrorMessage", out var apiError) && apiError.ValueKind == JsonValueKind.True)
+                        {
+                            (limitLabel, limitResetsAt) = LimitFrom(root);
+                        }
                     }
 
                     // Reading newest first, whichever of "a /model switch" and "a reply" turns up first
@@ -247,6 +271,8 @@ namespace Loupedeck.ClaudeDeckPlugin
             return new TranscriptInfo
             {
                 Effort = effort.Length > 0 ? effort : previous?.Effort ?? "",
+                LimitLabel = replySeen ? limitLabel : previous?.LimitLabel ?? "",
+                LimitResetsAt = replySeen ? limitResetsAt : previous?.LimitResetsAt ?? DateTime.MinValue,
                 // A tail that happens to hold no title line must not blank a tile that had one.
                 Title = title.Length > 0 ? title : previous?.Title ?? "",
                 Slug = slug.Length > 0 ? slug : previous?.Slug ?? "",
@@ -257,6 +283,58 @@ namespace Loupedeck.ClaudeDeckPlugin
                 SwitchedTo = modelSettled ? switchedTo : previous?.SwitchedTo ?? "",
                 ContextTokens = tokens >= 0 ? tokens : previous?.ContextTokens ?? 0,
             };
+        }
+
+        private static readonly System.Text.RegularExpressions.Regex ResetTime =
+            new(@"resets\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        // "You've hit your session limit · resets 4:40am (Asia/Calcutta)", stamped with when it was said.
+        private static (String Label, DateTime ResetsAt) LimitFrom(JsonElement root)
+        {
+            var text = "";
+            if (root.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.Object
+                && m.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var part in c.EnumerateArray())
+                {
+                    if (part.ValueKind == JsonValueKind.Object && Str(part, "text") is { Length: > 0 } t)
+                    {
+                        text = t;
+                        break;
+                    }
+                }
+            }
+
+            var said = DateTime.TryParse(Str(root, "timestamp"), null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var utc)
+                ? utc.ToLocalTime()
+                : DateTime.Now;
+
+            // The named time is in the user's own zone; it means its first occurrence after the message.
+            var match = ResetTime.Match(text);
+            if (match.Success)
+            {
+                var hour = Int32.Parse(match.Groups[1].Value) % 12;
+                if (match.Groups[3].Value.Equals("pm", StringComparison.OrdinalIgnoreCase))
+                {
+                    hour += 12;
+                }
+
+                var minute = match.Groups[2].Success ? Int32.Parse(match.Groups[2].Value) : 0;
+                var at = said.Date.AddHours(hour).AddMinutes(minute);
+                if (at <= said)
+                {
+                    at = at.AddDays(1);
+                }
+
+                var label = match.Groups[2].Success
+                    ? $"{match.Groups[1].Value}:{match.Groups[2].Value}{match.Groups[3].Value.ToLowerInvariant()}"
+                    : $"{match.Groups[1].Value}{match.Groups[3].Value.ToLowerInvariant()}";
+                return (label, at);
+            }
+
+            // A wording this does not recognise (a weekly limit names a date): the limit is real, its
+            // end unknown, so it is shown for one session window and then dropped.
+            return ("soon", said.AddHours(5));
         }
 
         private const String EffortSet = "<local-command-stdout>Set effort level to ";

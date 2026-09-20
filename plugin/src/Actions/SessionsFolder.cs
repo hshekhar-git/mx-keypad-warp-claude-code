@@ -35,8 +35,9 @@ namespace Loupedeck.ClaudeDeckPlugin
         // The session whose page is showing; null for the list.
         private volatile String _page;
 
-        // How many answer keys the page was last laid out with, so it is rebuilt when that changes.
+        // What the page was last laid out with, so it is rebuilt when either changes.
         private volatile Int32 _answerCount;
+        private volatile Boolean _limited;
 
         private volatile String _held;
         private volatile String _flash;
@@ -124,9 +125,16 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             var answers = this.PageAnswers();
             this._answerCount = answers.Count;
+            this._limited = this.Page?.IsLimited == true;
 
             var list = new List<String> { "p:back", "p:tile" };
             list.AddRange(answers.Select((_, i) => $"p:ans:{i}"));
+
+            // Out of usage: the one thing worth doing about it, offered where the answers would be.
+            if (this.Page?.IsLimited == true)
+            {
+                list.Add("p:lowpri");
+            }
             list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
             list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
             return list;
@@ -156,7 +164,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 }
 
                 // Answers arriving or leaving change which keys exist, not just what they say.
-                if (this.PageAnswers().Count != this._answerCount)
+                if (this.PageAnswers().Count != this._answerCount || this.Page.IsLimited != this._limited)
                 {
                     this.ButtonActionNamesChanged();
                 }
@@ -341,6 +349,9 @@ namespace Loupedeck.ClaudeDeckPlugin
                 case "p:info":
                     Deck.Focus(page);
                     return;
+                case "p:lowpri":
+                    Deck.RunSlash(page, "/low-priority");
+                    return;
                 case "p:model":
                     this._model.Tap(page);
                     return;
@@ -427,6 +438,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                     return TileRenderer.Session(page, Deck.Target?.Key == page.Key, flash, imageSize, this._frame);
                 case "p:info":
                     return TileRenderer.Info(page, imageSize);
+                case "p:lowpri":
+                    return TileRenderer.Command("continue at low priority", "amber", flash, imageSize);
                 case "p:model":
                     return this._model.Render(page, false, imageSize);
                 case "p:effort":
