@@ -11,7 +11,8 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static Boolean _reported;
 
-        // argv: expected bundle id ("" = any known terminal), text, "1" to press Return, "1" for Escape
+        // argv: expected bundle id ("" = any known terminal), text, "1" to press Return,
+        //       "1" for Escape or "2" for Shift-Tab instead of text
         private const String Script = @"
 on run argv
     tell application ""System Events""
@@ -24,6 +25,8 @@ on run argv
         end if
         if (item 4 of argv) is ""1"" then
             key code 53
+        else if (item 4 of argv) is ""2"" then
+            key code 48 using {shift down}
         else
             set theText to item 2 of argv
             if theText is not """" then keystroke theText
@@ -48,17 +51,20 @@ end run";
                 return false;
             }
 
-            return Send(expectedBundle, text, submit, false, $"type \"{text}\"{(submit ? " + Return" : "")}");
+            return Send(expectedBundle, text, submit, "0", $"type \"{text}\"{(submit ? " + Return" : "")}");
         }
 
-        public static Boolean SendEscape(String expectedBundle) => Send(expectedBundle, "", false, true, "send Escape");
+        public static Boolean SendEscape(String expectedBundle) => Send(expectedBundle, "", false, "1", "send Escape");
+
+        // What Claude Code cycles its permission mode on.
+        public static Boolean SendShiftTab(String expectedBundle) => Send(expectedBundle, "", false, "2", "send Shift-Tab");
 
         public static void Shutdown() => AccessibilityDenied = null;
 
-        private static Boolean Send(String expectedBundle, String text, Boolean submit, Boolean escape, String what)
+        private static Boolean Send(String expectedBundle, String text, Boolean submit, String special, String what)
         {
             var run = Shell.Run("/usr/bin/osascript", 5000,
-                "-e", Script, expectedBundle ?? "", text, submit ? "1" : "0", escape ? "1" : "0");
+                "-e", Script, expectedBundle ?? "", text, submit ? "1" : "0", special);
             var result = (run.Ok ? run.Output : run.Error).Trim();
 
             if (result == "ok")

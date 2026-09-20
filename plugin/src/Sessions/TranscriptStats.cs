@@ -3,6 +3,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System;
     using System.Collections.Concurrent;
     using System.IO;
+    using System.Linq;
     using System.Text;
     using System.Text.Json;
 
@@ -15,6 +16,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         // The display name from a /model switch, when that is more recent than the last reply;
         // empty otherwise. "Opus 5 (1M context)".
         public String SwitchedTo { get; init; } = "";
+
+        // From the last /effort in this session: low | medium | high | xhigh | max | auto. Empty when
+        // the session never ran one, in which case it is on the default.
+        public String Effort { get; init; } = "";
 
         // Tokens in the context window as of the last main-thread assistant message.
         public Int64 ContextTokens { get; init; }
@@ -73,6 +78,16 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
         }
 
+        // Re-read on the next ask, keeping what is known so far (unlike Forget, which starts over).
+        public static void Refresh(String path)
+        {
+            if (!String.IsNullOrEmpty(path) && Cache.TryGetValue(path, out var entry))
+            {
+                entry.Length = -1;
+                entry.ReadAt = DateTime.MinValue;
+            }
+        }
+
         public static void Forget(String path)
         {
             if (!String.IsNullOrEmpty(path))
@@ -112,6 +127,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var model = "";
             var switchedTo = "";
             var modelSettled = false;
+            var effort = "";
             Int64 tokens = -1;
 
             // Newest first, stopping as soon as everything has been seen once.
@@ -132,7 +148,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                 var wantsSlug = slug.Length == 0 && line.Contains("\"slug\"", StringComparison.Ordinal);
                 var wantsSwitch = !modelSettled
                     && (line.Contains("Set model to", StringComparison.Ordinal) || line.Contains("Kept model as", StringComparison.Ordinal));
-                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch)
+                var wantsEffort = effort.Length == 0 && IsEffortCandidate(line);
+                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch && !wantsEffort)
                 {
                     continue;
                 }
@@ -159,6 +176,11 @@ namespace Loupedeck.ClaudeDeckPlugin
                     if (slug.Length == 0)
                     {
                         slug = Str(root, "slug");
+                    }
+
+                    if (wantsEffort)
+                    {
+                        effort = EffortFrom(root);
                     }
 
                     // Reading newest first, whichever of "a /model switch" and "a reply" turns up first
@@ -207,15 +229,24 @@ namespace Loupedeck.ClaudeDeckPlugin
                 {
                 }
 
-                if (tokens >= 0 && slug.Length > 0 && (customTitle.Length > 0 || aiTitle.Length > 0))
+                if (tokens >= 0 && effort.Length > 0 && slug.Length > 0 && (customTitle.Length > 0 || aiTitle.Length > 0))
                 {
                     break;
                 }
             }
 
+            // Unlike the model, effort is not restated by every reply: one /effort early in a long
+            // session can be megabytes behind the tail. So the first time a transcript is seen, and
+            // only then, the whole file is searched for it; after that the tail keeps it current.
+            if (effort.Length == 0 && previous == null && length > TailBytes)
+            {
+                effort = ScanWholeFileForEffort(path);
+            }
+
             var title = customTitle.Length > 0 ? customTitle : aiTitle;
             return new TranscriptInfo
             {
+                Effort = effort.Length > 0 ? effort : previous?.Effort ?? "",
                 // A tail that happens to hold no title line must not blank a tile that had one.
                 Title = title.Length > 0 ? title : previous?.Title ?? "",
                 Slug = slug.Length > 0 ? slug : previous?.Slug ?? "",
@@ -226,6 +257,75 @@ namespace Loupedeck.ClaudeDeckPlugin
                 SwitchedTo = modelSettled ? switchedTo : previous?.SwitchedTo ?? "",
                 ContextTokens = tokens >= 0 ? tokens : previous?.ContextTokens ?? 0,
             };
+        }
+
+        private const String EffortSet = "<local-command-stdout>Set effort level to ";
+        private const String EffortAuto = "<local-command-stdout>Effort level set to auto";
+
+        private static Boolean IsEffortCandidate(String line) =>
+            line.Contains("Set effort level to ", StringComparison.Ordinal)
+            || line.Contains("Effort level set to auto", StringComparison.Ordinal);
+
+        // Matched on the whole message, not a substring: transcripts quote this text too.
+        private static String EffortFrom(JsonElement root)
+        {
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("message", out var m) || m.ValueKind != JsonValueKind.Object
+                || !m.TryGetProperty("content", out var c) || c.ValueKind != JsonValueKind.String)
+            {
+                return "";
+            }
+
+            var text = c.GetString() ?? "";
+            if (text.StartsWith(EffortAuto, StringComparison.Ordinal))
+            {
+                return "auto";
+            }
+
+            if (!text.StartsWith(EffortSet, StringComparison.Ordinal))
+            {
+                return "";
+            }
+
+            var word = new String(text.Substring(EffortSet.Length).TakeWhile(Char.IsLetter).ToArray());
+            return word.ToLowerInvariant();
+        }
+
+        private static String ScanWholeFileForEffort(String path)
+        {
+            var found = "";
+            try
+            {
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(fs, Encoding.UTF8);
+                String line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (!IsEffortCandidate(line))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(line);
+                        var value = EffortFrom(doc.RootElement);
+                        if (value.Length > 0)
+                        {
+                            found = value;
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Verbose($"effort scan failed for {path}: {ex.Message}");
+            }
+
+            return found;
         }
 
         private static String Str(JsonElement e, String name) =>

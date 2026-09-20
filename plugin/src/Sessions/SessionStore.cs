@@ -32,6 +32,11 @@ namespace Loupedeck.ClaudeDeckPlugin
         public String Tool { get; init; } = "";
         public String Detail { get; init; } = "";
 
+        // Permission mode as of the last hook event, and when that event was.
+        public String Mode { get; init; } = "";
+        public Int64 Ts { get; init; }
+        public Int32 Turns { get; init; }
+
         // For a single multiple-choice AskUserQuestion: its wording and option labels.
         public String Question { get; init; } = "";
         public IReadOnlyList<String> Options { get; init; } = Array.Empty<String>();
@@ -43,6 +48,9 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         // The model this session is set to right now, /model switches included.
         public ModelName Selected { get; set; } = ModelName.Unknown;
+
+        // auto | low | medium | high | xhigh | max
+        public String Effort { get; set; } = "auto";
         public Int64 ContextTokens { get; set; }
         public Int32 ContextWindow { get; set; }
 
@@ -308,6 +316,9 @@ namespace Loupedeck.ClaudeDeckPlugin
                         TurnSince = Num(r, "turn_since"),
                         Tool = Str(r, "tool"),
                         Detail = Str(r, "detail"),
+                        Mode = Str(r, "mode"),
+                        Ts = ts,
+                        Turns = (Int32)Num(r, "turns"),
                         Question = Str(r, "question"),
                         Options = r.TryGetProperty("options", out var opts) && opts.ValueKind == JsonValueKind.Array
                             ? opts.EnumerateArray().Where(o => o.ValueKind == JsonValueKind.String).Select(o => o.GetString() ?? "").ToList()
@@ -393,6 +404,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 s.Model = info.Model;
                 s.ContextTokens = info.ContextTokens;
                 s.Selected = ModelNames.Resolve(info.SwitchedTo, info.Model);
+                s.Effort = info.Effort.Length > 0 ? info.Effort : ModelNames.DefaultEffort;
 
                 // More than 200k tokens in the window settles the question whatever the names say.
                 if (!s.Selected.OneM && s.Selected.IsKnown && info.ContextTokens > 200_000)
@@ -479,6 +491,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     .Append(s.Prompt).Append('\u001f')
                     .Append(s.Here ? '1' : '0').Append('\u001f')
                     .Append(s.Selected.Name).Append(s.Selected.OneM ? "+" : "").Append('\u001f')
+                    .Append(s.Effort).Append('\u001f').Append(s.Mode).Append('\u001f').Append(s.Turns).Append('\u001f')
                     .Append(String.Join(",", s.Options)).Append('\u001f')
                     .Append((Int32)(s.ContextFill * 100)).Append('\u001e');
             }

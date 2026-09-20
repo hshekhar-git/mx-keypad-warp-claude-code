@@ -17,6 +17,41 @@ Then drag the keys onto your keypad in Logi Options+ and grant Accessibility - t
 [full walkthrough](#install) has every step, a way to check it works, and
 [troubleshooting](#troubleshooting).
 
+## Two layers
+
+**Claude Sessions** opens a list of every running session, eight to a page. **Press one and you are on
+that session's own page:**
+
+```
+┌───────────┬───────────┬───────────┐
+│  ‹ Back   │ ‹ sessions│  the tile │   ‹ sessions  up one level; turns red and says "1 needs you"
+│ (Options+)│ 2 others  │ Edit 2:31 │                 when another session is blocked
+├───────────┼───────────┼───────────┤   the tile    live; press = jump to its pane, hold = interrupt
+│  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
+│ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch)
+│ feat/hero │ 1M context│           │   effort      auto · low · medium · high · xhigh · max
+├───────────┼───────────┼───────────┤   mode        ask · auto-edit · plan  (Shift-Tab)
+│   mode    │    esc    │ /compact  │   then your command keys; more on the next page ▶
+│ auto-edit │           │           │
+└───────────┴───────────┴───────────┘
+```
+
+While the session is **blocked**, the answers come first, straight after the tile: **yes / always / no**
+for a permission prompt, the **actual option labels** for a multiple-choice question.
+
+- **Everything that can be changed is changed the same way:** tap to step through the choices, ringed
+  in white; it is sent once, a second and a half after your last tap. Tapping back round to the value
+  in use sends nothing.
+- **Effort** is read from the session's own `/effort` history (the whole transcript is searched once,
+  since one early `/effort` can be megabytes back), else `effortLevel` in your settings, else `auto`.
+- **Permission mode** comes from Claude Code's hooks, which only report it when something happens. So
+  right after a change the key shows what it just set, and the next event confirms or corrects it.
+  Mode changes work mid-turn; model and effort are refused while the session is busy.
+- Reopening the folder starts at the list - unless exactly one session is blocked on you, in which
+  case it opens straight onto that one.
+- **Model**, **Effort** and **Permission mode** also exist as home-page keys, acting on the target
+  session (the pane you are in, else the last one you opened).
+
 ## What a tile tells you
 
 ```
@@ -36,7 +71,7 @@ Then drag the keys onto your keypad in Logi Options+ and grant Accessibility - t
 | purple | **error** — the turn died | `StopFailure` |
 | grey | **idle** | `SessionStart` |
 
-One keypad page per Warp tab; sessions in other terminals get a page per app. ◀ ▶ walk the pages.
+
 
 ## App Switcher
 
@@ -79,16 +114,9 @@ default for new sessions. Tapping all the way round to the model already in use 
 
 ## Keys
 
-**Inside the *Claude Sessions* folder**
-
-| Key | Does |
-|---|---|
-| a tile | focuses that exact Warp pane (window, tab, split). Every press **flashes** the key, so a press that changed nothing on screen still says it worked |
-| side bars on a tile | **you are here**: the pane you are actually typing in (read from Warp), which is also the one the other keys act on. With no terminal in front, the tile you last pressed |
-| a tile, **held** | interrupts *that* session (focus + Escape), wherever it is |
-| bottom row | your command keys from `config.json` |
-| **while that session is on a permission prompt** | the last keys of its page become **yes / always / no** |
-| **while it is asking a multiple-choice question** | the tile shows the question and the keys become the **actual option labels** ("2 Supabase Auth"). Uses the command row plus any blank tiles, and only appears if every option fits |
+**Inside the *Claude Sessions* folder** - see [Two layers](#two-layers). In the list, side bars mark
+the pane you are actually in; every press flashes the key; **hold** a tile to interrupt that session
+without opening it.
 
 **On your home page** (drag from Options+ → *MX Keypad Warp Claude Code*)
 
@@ -98,6 +126,8 @@ default for new sessions. Tapping all the way round to the model already in use 
 | **Working** | how many are still running | cycles through them |
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
 | **Model** | the target session's model, and whether it is on the 1M window | steps to the next model; commits when you stop tapping |
+| **Effort** | its effort level | steps `auto → low → medium → high → xhigh → max` |
+| **Permission mode** | `ask`, `auto-edit` or `plan` | steps it (Shift-Tab) |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |
 
@@ -169,7 +199,8 @@ Open **Logi Options+ → MX Creative Keypad**. In the actions panel find the plu
 |---|---|---|
 | **Claude Sessions** | Claude | any home-page key - it is a folder; pressing it opens the deck |
 | **App Switcher** | Apps | any home-page key - also a folder |
-| **Needs me**, **Working**, **Allow**, **Model** | Claude | home page - they are live status keys |
+| **Needs me**, **Working**, **Allow** | Claude | home page - live status keys |
+| *optional:* **Model**, **Effort**, **Permission mode** | Claude | home page - the same controls as on a session's page, for the target session |
 | *optional:* **Models** | Claude | a folder: pick a model from a list instead of tapping through |
 | *optional:* **Open App** | Apps | a direct "go to Warp" key: type `Warp` in its form |
 | *optional:* anything under **Commands**, or **Send to Claude** | Commands / Claude | home page |

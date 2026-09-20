@@ -39,6 +39,17 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static DateTime _defaultReadAt = DateTime.MinValue;
         private static String _default = "";
+        private static String _defaultEffort = "auto";
+
+        // "effortLevel" in ~/.claude/settings.json; auto when unset.
+        public static String DefaultEffort
+        {
+            get
+            {
+                _ = DefaultId;
+                return _defaultEffort;
+            }
+        }
 
         public static ModelName FromId(String id)
         {
@@ -110,6 +121,10 @@ namespace Loupedeck.ClaudeDeckPlugin
                     _default = doc.RootElement.TryGetProperty("model", out var m) && m.ValueKind == JsonValueKind.String
                         ? m.GetString() ?? ""
                         : "";
+                    _defaultEffort = doc.RootElement.TryGetProperty("effortLevel", out var e) && e.ValueKind == JsonValueKind.String
+                        && e.GetString() is { Length: > 0 } level
+                        ? level.ToLowerInvariant()
+                        : "auto";
                 }
                 catch
                 {

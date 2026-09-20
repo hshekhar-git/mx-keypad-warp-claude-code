@@ -160,6 +160,8 @@ printf '%s' "$PAYLOAD" | "$JQ" -c \
       prompt: (if $ev == "prompt" then (($p.prompt // "") | clean(140)) else ($o.prompt // "") end),
       state: $state,
       kind: $kind,
+      # default | acceptEdits | plan | bypassPermissions - as of the last event that carried it.
+      mode: ($p.permission_mode // $o.mode // ""),
       since: (if $state == $was then ($o.since // $now) else $now end),
       turn_since: (if $ev == "prompt" then $now else ($o.turn_since // $now) end),
       ts: $now,

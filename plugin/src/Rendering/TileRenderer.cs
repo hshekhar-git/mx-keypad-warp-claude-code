@@ -251,6 +251,57 @@ namespace Loupedeck.ClaudeDeckPlugin
             _ => Neutral,
         };
 
+        // ---- a session's own page -----------------------------------------------------------
+
+        // Everything about a session that is a fact rather than a setting: how full its context
+        // window is, in tokens as well as the bar; its branch; how long and how many turns it has run.
+        public static BitmapImage Info(SessionInfo s, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var w = b.Width;
+            var h = b.Height;
+            b.Clear(Neutral);
+            var soft = Tint(Neutral, 0.6);
+
+            var fill = s.ContextFill;
+            var barH = Math.Max(6, (Int32)(h * 0.07));
+            b.FillRectangle(0, 0, w, barH, Shade(Neutral, 0.45));
+            if (fill >= 0)
+            {
+                b.FillRectangle(0, 0, Math.Max(2, (Int32)(w * fill)), barH, fill >= 0.8 ? Warn : Tint(Neutral, 0.75));
+            }
+
+            var headline = fill >= 0 ? $"{(Int32)Math.Round(fill * 100)}% ctx" : "ctx ?";
+            b.DrawText(headline, 2, (Int32)(h * 0.10), w - 4, (Int32)(h * 0.28), fill >= 0.8 ? Warn : BitmapColor.White, 17);
+            b.DrawText(fill >= 0 ? $"{Tokens(s.ContextTokens)} of {Tokens(s.ContextWindow)}" : "no reply yet",
+                2, (Int32)(h * 0.38), w - 4, (Int32)(h * 0.18), soft, 11);
+            b.DrawText(Middle(Or(s.Branch, "no branch"), 16), 2, (Int32)(h * 0.58), w - 4, (Int32)(h * 0.18), BitmapColor.White, 11);
+
+            var age = s.Started > 0 ? Elapsed(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - s.Started) : "";
+            b.DrawText($"{s.Turns} turn{(s.Turns == 1 ? "" : "s")}{(age.Length > 0 ? " · " + age : "")}",
+                2, (Int32)(h * 0.76), w - 4, (Int32)(h * 0.18), soft, 11);
+            return b.ToImage();
+        }
+
+        private static String Tokens(Int64 n) =>
+            n >= 1_000_000 ? $"{n / 1_000_000.0:0.#}M" : n >= 1000 ? $"{n / 1000}k" : n.ToString();
+
+        public static BitmapImage Back(Int32 others, Int32 waiting, Boolean flash, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var h = b.Height;
+            b.Clear(waiting > 0 ? Shade(Attention, 0.25) : Empty);
+            b.DrawText("‹ sessions", 2, (Int32)(h * 0.24), b.Width - 4, (Int32)(h * 0.30), BitmapColor.White, 15);
+            var note = waiting > 0 ? $"{waiting} need{(waiting == 1 ? "s" : "")} you" : others > 0 ? $"{others} other{(others == 1 ? "" : "s")}" : "";
+            b.DrawText(note, 2, (Int32)(h * 0.58), b.Width - 4, (Int32)(h * 0.20), Tint(Empty, 0.65), 11);
+            if (flash)
+            {
+                DrawFlash(b);
+            }
+
+            return b.ToImage();
+        }
+
         // ---- models -------------------------------------------------------------------------
 
         // The Model key. At rest: the target session's model, filling the key in that model's colour.

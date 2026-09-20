@@ -142,21 +142,22 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
         }
 
-        // Switches a session's model by typing "/model <alias>" into it.
-        //
-        // Refused while the session is mid-turn or blocked on a prompt: text typed then is either
-        // queued as a message to Claude or lands in a dialog, and neither is a model switch.
-        public static Boolean SwitchModel(SessionInfo s, ModelDef model)
+        // Why a slash command cannot be typed into a session right now, or null if it can. Mid-turn,
+        // typed text is queued as a message to Claude; at a prompt, it lands in the dialog.
+        public static String Busy(SessionInfo s) => s?.State switch
+        {
+            "busy" => "busy - wait",
+            "attention" => "answer it first",
+            _ => null,
+        };
+
+        // Types a slash command into one specific session and submits it.
+        public static Boolean RunSlash(SessionInfo s, String command)
         {
             s = SessionStore.Instance.Find(s?.Key);
-            if (s == null || model == null)
+            if (s == null || String.IsNullOrWhiteSpace(command) || Busy(s) != null)
             {
-                return false;
-            }
-
-            if (s.State is "busy" or "attention")
-            {
-                PluginLog.Info($"model not switched: {s.Project} is {s.State}");
+                PluginLog.Info($"not sent: {command} ({s?.Project} is {s?.State})");
                 return false;
             }
 
@@ -166,20 +167,47 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             Thread.Sleep(FocusSettleMs);
-            PluginLog.Info($"switching {s.Project} to {model.Alias}");
-            if (!TermInput.TypeText(s.Bundle, $"/model {model.Alias}", true))
+            PluginLog.Info($"sending \"{command}\" to {s.Project}");
+            if (!TermInput.TypeText(s.Bundle, command, true))
             {
                 return false;
             }
 
-            // The switch shows up in the transcript a moment later; look for it rather than waiting
+            // The result shows up in the transcript a moment later; look for it rather than waiting
             // out the usual re-read interval.
             var transcript = s.Transcript;
             System.Threading.Tasks.Task.Delay(1500).ContinueWith(_ =>
             {
-                TranscriptStats.Forget(transcript);
+                TranscriptStats.Refresh(transcript);
                 SessionStore.Instance.Poke();
             });
+            return true;
+        }
+
+        public static Boolean SwitchModel(SessionInfo s, ModelDef model) =>
+            model != null && RunSlash(s, $"/model {model.Alias}");
+
+        // Shift-Tab, n times: how Claude Code steps its permission mode. Works mid-turn, but not
+        // while a dialog has the keyboard.
+        public static Boolean CycleMode(SessionInfo s, Int32 steps)
+        {
+            s = SessionStore.Instance.Find(s?.Key);
+            if (s == null || steps < 1 || s.State == "attention" || !Focus(s))
+            {
+                return false;
+            }
+
+            Thread.Sleep(FocusSettleMs);
+            for (var i = 0; i < steps; i++)
+            {
+                if (!TermInput.SendShiftTab(s.Bundle))
+                {
+                    return false;
+                }
+
+                Thread.Sleep(120);
+            }
+
             return true;
         }
 

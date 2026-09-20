@@ -5,33 +5,40 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System.Linq;
     using System.Threading;
 
-    // The deck: one keypad page per Warp tab (then one per other terminal app).
+    // The deck, in two layers.
     //
-    // The host chunks a dynamic folder's action list into pages and keeps the top-left key for Back,
-    // which leaves EIGHT tiles per page on the MX Creative Keypad. Emitting exactly eight names per
-    // group - session tiles, blanks, then the command row - makes page N land on group N for free.
+    // LIST   every session as a live tile - eight to a page (or one page per Warp tab, by config).
+    //        Press one to open it; hold one to interrupt it without going in.
     //
-    // The keys around the tiles are contextual. Normally the bottom row is the keys from config.json;
-    // while the target session is blocked on something the keypad can answer - a permission prompt, a
-    // multiple-choice question - the last free keys on ITS page become the answers, spelled out.
-    // "Free" means the command row plus any blank tiles before it, so a four-option question still
-    // fits on a page with a three-key row.
+    // PAGE   one session: a way back, its live tile (press = jump to its pane), its facts (context,
+    //        branch, turns, age), its settings (model, effort, permission mode - tap to step), then
+    //        your command keys. While it is blocked on a prompt the keypad can answer, the answers
+    //        come first, straight after the tile.
+    //
+    // The host keeps the top-left key for its own Back, which leaves the folder entirely; hence the
+    // page's own "sessions" key for going up one level. Eight names per page keeps both layers
+    // aligned with the host's paging.
     public class SessionsFolder : PluginDynamicFolder
     {
         private const Int32 TilesPerPage = 8;
+        private const Int32 FlashFrames = 2;
         private const String Notice = "notice";
 
-        private const Int32 FlashFrames = 2;
-
         private readonly Timer _tick;
+        private readonly SettingStepper _model = new(new ModelSetting());
+        private readonly SettingStepper _effort = new(new EffortSetting());
+        private readonly SettingStepper _mode = new(new ModeSetting());
+
         private volatile Boolean _open;
         private volatile Int32 _frame;
 
-        // The tile whose long press has already been acted on, so its Release can be ignored.
-        private volatile String _held;
+        // The session whose page is showing; null for the list.
+        private volatile String _page;
 
-        // The key pressed most recently, lit for a moment so a press that worked says so - focusing
-        // the pane you are already in changes nothing on screen, and silence reads as "broken".
+        // How many answer keys the page was last laid out with, so it is rebuilt when that changes.
+        private volatile Int32 _answerCount;
+
+        private volatile String _held;
         private volatile String _flash;
         private volatile Int32 _flashUntil;
 
@@ -40,9 +47,14 @@ namespace Loupedeck.ClaudeDeckPlugin
             this.DisplayName = "Claude Sessions";
             this.GroupName = "Claude";
             this._tick = new Timer(_ => this.OnTick(), null, Timeout.Infinite, Timeout.Infinite);
+            this._model.Changed += (_, _) => this.Repaint("p:model");
+            this._effort.Changed += (_, _) => this.Repaint("p:effort");
+            this._mode.Changed += (_, _) => this.Repaint("p:mode");
         }
 
         private static SessionStore Store => SessionStore.Instance;
+
+        private SessionInfo Page => Store.Find(this._page);
 
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
             PluginDynamicFolderNavigation.ButtonArea;
@@ -50,6 +62,12 @@ namespace Loupedeck.ClaudeDeckPlugin
         public override Boolean Activate()
         {
             this._open = true;
+
+            // Reopening the folder starts at the list - unless something is waiting on you and it is
+            // the only thing that is, in which case its page is where you were going anyway.
+            var waiting = Store.All.Where(s => s.State == "attention").ToList();
+            this._page = waiting.Count == 1 ? waiting[0].Key : null;
+
             Store.Changed += this.OnChanged;
             DeckConfig.Changed += this.OnLayoutChanged;
             Deck.TargetChanged += this.OnRepaint;
@@ -69,11 +87,81 @@ namespace Loupedeck.ClaudeDeckPlugin
             return base.Deactivate();
         }
 
+        // ---- layout -------------------------------------------------------------------------
+
+        private List<String> BuildParameters() => this._page != null ? this.BuildPage() : BuildList();
+
+        private static List<String> BuildList()
+        {
+            var groups = Store.Groups;
+            if (groups.Count == 0)
+            {
+                return new List<String> { Notice };
+            }
+
+            if (DeckConfig.SessionGrouping != "tab")
+            {
+                return groups.SelectMany(g => g.Sessions).Select(s => $"s:{s.Key}").ToList();
+            }
+
+            // One page per tab: pad each group out to a whole number of pages.
+            var list = new List<String>();
+            foreach (var g in groups)
+            {
+                var slots = Math.Max(1, (g.Sessions.Count + TilesPerPage - 1) / TilesPerPage) * TilesPerPage;
+                for (var i = 0; i < slots; i++)
+                {
+                    list.Add(i < g.Sessions.Count ? $"s:{g.Sessions[i].Key}" : $"x:{g.Id}:{i}");
+                }
+            }
+
+            return list;
+        }
+
+        private IReadOnlyList<AnswerKey> PageAnswers() => Deck.AnswersFor(this.Page, TilesPerPage - 2);
+
+        private List<String> BuildPage()
+        {
+            var answers = this.PageAnswers();
+            this._answerCount = answers.Count;
+
+            var list = new List<String> { "p:back", "p:tile" };
+            list.AddRange(answers.Select((_, i) => $"p:ans:{i}"));
+            list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
+            list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
+            return list;
+        }
+
+        public override IEnumerable<String> GetButtonPressActionNames(DeviceType deviceType) =>
+            this.BuildParameters().Select(p => this.CreateCommandName(p)).ToList();
+
+        private void Show(String sessionKey)
+        {
+            this._page = sessionKey;
+            this.ButtonActionNamesChanged();
+            this.RepaintAll();
+        }
+
+        // ---- change handling ----------------------------------------------------------------
+
         private void OnChanged(Object sender, EventArgs e)
         {
-            // Rebuilding the pages on every state change would be visible churn; only a change in
-            // WHICH tiles exist needs it.
-            if (e is LayoutChangedEventArgs)
+            if (this._page != null)
+            {
+                // The session ended: there is no page to show any more.
+                if (this.Page == null)
+                {
+                    this.Show(null);
+                    return;
+                }
+
+                // Answers arriving or leaving change which keys exist, not just what they say.
+                if (this.PageAnswers().Count != this._answerCount)
+                {
+                    this.ButtonActionNamesChanged();
+                }
+            }
+            else if (e is LayoutChangedEventArgs)
             {
                 this.ButtonActionNamesChanged();
             }
@@ -89,8 +177,29 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private void OnRepaint(Object sender, EventArgs e) => this.RepaintAll();
 
-        // Only tiles that are actually moving are repainted each tick; everything else gets a slow
-        // refresh so "done 4:59" still becomes "done 5:00".
+        private void Repaint(String parameter)
+        {
+            if (this._open)
+            {
+                this.CommandImageChanged(parameter);
+            }
+        }
+
+        private void RepaintAll()
+        {
+            if (!this._open)
+            {
+                return;
+            }
+
+            foreach (var name in this.BuildParameters())
+            {
+                this.CommandImageChanged(name);
+            }
+        }
+
+        // Only what is actually moving is repainted each tick; everything else gets a slow refresh
+        // so "done 4:59" still becomes "done 5:00".
         private void OnTick()
         {
             if (!this._open)
@@ -112,6 +221,17 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return;
             }
 
+            if (this._page != null)
+            {
+                var s = this.Page;
+                if (s != null && TileRenderer.Animates(s))
+                {
+                    this.CommandImageChanged("p:tile");
+                }
+
+                return;
+            }
+
             foreach (var s in Store.All)
             {
                 if (TileRenderer.Animates(s))
@@ -121,121 +241,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
         }
 
-        private void RepaintAll()
-        {
-            if (!this._open)
-            {
-                return;
-            }
-
-            foreach (var name in this.BuildParameters())
-            {
-                this.CommandImageChanged(name);
-            }
-        }
-
-        private List<String> BuildParameters()
-        {
-            var groups = Store.Groups;
-            if (groups.Count == 0)
-            {
-                return new List<String> { Notice };
-            }
-
-            // Snapshotted once: the config is re-read on a timer and must not change the split
-            // halfway through a page.
-            var keys = DeckConfig.Keys.Count;
-            var perPage = Math.Max(1, TilesPerPage - keys);
-            var list = new List<String>();
-
-            foreach (var g in groups)
-            {
-                var pages = Math.Max(1, (g.Sessions.Count + perPage - 1) / perPage);
-                for (var page = 0; page < pages; page++)
-                {
-                    for (var slot = 0; slot < perPage; slot++)
-                    {
-                        var index = (page * perPage) + slot;
-                        list.Add(index < g.Sessions.Count
-                            ? $"s:{g.Sessions[index].Key}"
-                            : $"x:{g.Id}:{page}:{slot}");
-                    }
-
-                    // Parameters must be unique across the whole list or the host folds them into
-                    // one tile, hence the group and page in the name.
-                    for (var i = 0; i < keys; i++)
-                    {
-                        list.Add($"k:{i}:{g.Id}:{page}");
-                    }
-                }
-            }
-
-            return list;
-        }
-
-        public override IEnumerable<String> GetButtonPressActionNames(DeviceType deviceType)
-        {
-            var names = this.BuildParameters().Select(p => this.CreateCommandName(p)).ToList();
-            PluginLog.Info($"pages built for {deviceType}: {Store.Groups.Count} group(s), {names.Count} tile(s)");
-            return names;
-        }
-
-        // Which keys are answers right now, by action parameter.
-        //
-        // Only on the page holding the target session, and always the LAST free keys of that page in
-        // prompt order, so the final answer sits bottom-right and the rest read left to right into it.
-        private Dictionary<String, AnswerKey> AnswerSlots(out SessionInfo target)
-        {
-            var map = new Dictionary<String, AnswerKey>(StringComparer.Ordinal);
-            var t = Deck.Target;
-            target = t;
-            if (t == null || t.State != "attention")
-            {
-                return map;
-            }
-
-            var keys = DeckConfig.Keys.Count;
-            var perPage = Math.Max(1, TilesPerPage - keys);
-            foreach (var g in Store.Groups)
-            {
-                var index = g.Sessions.FindIndex(x => x.Key == t.Key);
-                if (index < 0)
-                {
-                    continue;
-                }
-
-                var page = index / perPage;
-                var onPage = Math.Min(perPage, g.Sessions.Count - (page * perPage));
-                var free = new List<String>();
-                for (var slot = onPage; slot < perPage; slot++)
-                {
-                    free.Add($"x:{g.Id}:{page}:{slot}");
-                }
-
-                for (var i = 0; i < keys; i++)
-                {
-                    free.Add($"k:{i}:{g.Id}:{page}");
-                }
-
-                var answers = Deck.AnswersFor(t, free.Count);
-                for (var i = 0; i < answers.Count; i++)
-                {
-                    map[free[free.Count - answers.Count + i]] = answers[i];
-                }
-
-                break;
-            }
-
-            return map;
-        }
-
-        private static KeyDef ConfiguredKey(String actionParameter)
-        {
-            var parts = actionParameter.Split(':');
-            var keys = DeckConfig.Keys;
-            return parts.Length >= 2 && Int32.TryParse(parts[1], out var i) && i >= 0 && i < keys.Count ? keys[i] : null;
-        }
-
         private void Flash(String actionParameter)
         {
             this._flash = actionParameter;
@@ -243,10 +248,13 @@ namespace Loupedeck.ClaudeDeckPlugin
             this.CommandImageChanged(actionParameter);
         }
 
-        // Short press focuses; holding a tile interrupts THAT session, wherever it is.
+        // ---- presses ------------------------------------------------------------------------
+
+        // Holding a session - its tile in the list, or the tile on its page - interrupts it.
         public override Boolean ProcessButtonEvent2(String actionParameter, DeviceButtonEvent2 buttonEvent)
         {
-            if (actionParameter == null || !actionParameter.StartsWith("s:", StringComparison.Ordinal))
+            var session = this.SessionFor(actionParameter);
+            if (session == null)
             {
                 return false;
             }
@@ -255,10 +263,10 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 case DeviceButtonEventType.LongPress:
                     this._held = actionParameter;
-                    var s = Store.Find(actionParameter.Substring(2));
-                    if (s != null && Deck.Interrupt(s))
+                    this.Flash(actionParameter);
+                    if (Deck.Interrupt(session))
                     {
-                        PluginLog.Info($"long press interrupted {s.Project}");
+                        PluginLog.Info($"long press interrupted {session.Project}");
                     }
 
                     return true;
@@ -275,6 +283,23 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
         }
 
+        private SessionInfo SessionFor(String actionParameter)
+        {
+            if (actionParameter == null)
+            {
+                return null;
+            }
+
+            if (actionParameter == "p:tile")
+            {
+                return this.Page;
+            }
+
+            return actionParameter.StartsWith("s:", StringComparison.Ordinal)
+                ? Store.Find(actionParameter.Substring(2))
+                : null;
+        }
+
         public override void RunCommand(String actionParameter)
         {
             if (actionParameter == null)
@@ -282,26 +307,78 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return;
             }
 
+            // List: open the session's page.
             if (actionParameter.StartsWith("s:", StringComparison.Ordinal))
             {
-                this.Flash(actionParameter);
-                Deck.Focus(Store.Find(actionParameter.Substring(2)));
+                var s = Store.Find(actionParameter.Substring(2));
+                if (s == null)
+                {
+                    return;
+                }
+
+                if (DeckConfig.FocusOnOpen)
+                {
+                    Deck.Focus(s);
+                }
+
+                this.Show(s.Key);
                 return;
             }
 
-            if (this.AnswerSlots(out var target).TryGetValue(actionParameter, out var answer))
+            if (!actionParameter.StartsWith("p:", StringComparison.Ordinal))
             {
-                this.Flash(actionParameter);
-                Deck.Respond(target, answer);
                 return;
             }
 
-            if (actionParameter.StartsWith("k:", StringComparison.Ordinal) && ConfiguredKey(actionParameter) is { } key)
+            var page = this.Page;
+            this.Flash(actionParameter);
+            switch (actionParameter)
             {
-                this.Flash(actionParameter);
-                Deck.Send(key, bringForward: true);
+                case "p:back":
+                    this.Show(null);
+                    return;
+                case "p:tile":
+                case "p:info":
+                    Deck.Focus(page);
+                    return;
+                case "p:model":
+                    this._model.Tap(page);
+                    return;
+                case "p:effort":
+                    this._effort.Tap(page);
+                    return;
+                case "p:mode":
+                    this._mode.Tap(page);
+                    return;
+            }
+
+            if (Index(actionParameter, "p:ans:") is { } a)
+            {
+                var answers = this.PageAnswers();
+                if (a < answers.Count)
+                {
+                    Deck.Respond(page, answers[a]);
+                }
+
+                return;
+            }
+
+            if (Index(actionParameter, "p:k:") is { } k && k < DeckConfig.Keys.Count && page != null)
+            {
+                // A page's keys are about THAT session, so it is brought forward whatever is in front.
+                Deck.Focus(page);
+                Thread.Sleep(350);
+                Deck.Send(DeckConfig.Keys[k], bringForward: true);
             }
         }
+
+        private static Int32? Index(String actionParameter, String prefix) =>
+            actionParameter.StartsWith(prefix, StringComparison.Ordinal)
+            && Int32.TryParse(actionParameter.Substring(prefix.Length), out var i) && i >= 0
+                ? i
+                : null;
+
+        // ---- drawing ------------------------------------------------------------------------
 
         public override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)
         {
@@ -320,22 +397,55 @@ namespace Loupedeck.ClaudeDeckPlugin
                     : TileRenderer.Blank(imageSize);
             }
 
-            if (this.AnswerSlots(out _).TryGetValue(actionParameter, out var answer))
-            {
-                return TileRenderer.Command(answer.Label, answer.Color, flash, imageSize);
-            }
-
-            if (actionParameter.StartsWith("k:", StringComparison.Ordinal))
-            {
-                var key = ConfiguredKey(actionParameter);
-                return key != null ? TileRenderer.Command(key.Label, key.Color, flash, imageSize) : TileRenderer.Blank(imageSize);
-            }
-
             if (actionParameter == Notice)
             {
                 return HookStatus.IsWired
                     ? TileRenderer.Message("No sessions", "start claude in a terminal", imageSize)
-                    : TileRenderer.Message("Not set up", "run hooks/ install-hooks.sh", imageSize);
+                    : TileRenderer.Message("Not set up", "run ./install.sh", imageSize);
+            }
+
+            if (!actionParameter.StartsWith("p:", StringComparison.Ordinal))
+            {
+                return TileRenderer.Blank(imageSize);
+            }
+
+            var page = this.Page;
+            if (actionParameter == "p:back")
+            {
+                var others = Store.All.Where(s => s.Key != this._page).ToList();
+                return TileRenderer.Back(others.Count, others.Count(s => s.State == "attention"), flash, imageSize);
+            }
+
+            if (page == null)
+            {
+                return TileRenderer.Blank(imageSize);
+            }
+
+            switch (actionParameter)
+            {
+                case "p:tile":
+                    return TileRenderer.Session(page, Deck.Target?.Key == page.Key, flash, imageSize, this._frame);
+                case "p:info":
+                    return TileRenderer.Info(page, imageSize);
+                case "p:model":
+                    return this._model.Render(page, false, imageSize);
+                case "p:effort":
+                    return this._effort.Render(page, false, imageSize);
+                case "p:mode":
+                    return this._mode.Render(page, false, imageSize);
+            }
+
+            if (Index(actionParameter, "p:ans:") is { } a)
+            {
+                var answers = this.PageAnswers();
+                return a < answers.Count
+                    ? TileRenderer.Command(answers[a].Label, answers[a].Color, flash, imageSize)
+                    : TileRenderer.Blank(imageSize);
+            }
+
+            if (Index(actionParameter, "p:k:") is { } k && k < DeckConfig.Keys.Count)
+            {
+                return TileRenderer.Command(DeckConfig.Keys[k].Label, DeckConfig.Keys[k].Color, flash, imageSize);
             }
 
             return TileRenderer.Blank(imageSize);

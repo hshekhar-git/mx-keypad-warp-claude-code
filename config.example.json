@@ -18,6 +18,12 @@
   // A turn shorter than minTurnSeconds finishing is not announced - you are still watching it.
   "haptics": { "attention": true, "done": true, "error": true, "minTurnSeconds": 20 },
 
+  // The Claude Sessions folder.
+  //   group        "flat" - every session in one list, eight to a page
+  //                "tab"  - one page per Warp tab
+  //   focusOnOpen  pressing a session also brings its pane to the front (false: just open its page)
+  "sessions": { "group": "flat", "focusOnOpen": true },
+
   // The Model key and the Models folder.
   //   alias  typed after "/model " - an alias (opus) or a full id (claude-opus-5[1m])
   //   label  what the key shows (defaults to the alias)
@@ -43,17 +49,17 @@
     "closeOnSwitch": true
   },
 
-  // The command row at the bottom of every page. Session tiles get the other (8 - keys) slots, so
-  // fewer keys means more sessions per page; [] gives all eight to sessions. Max 7.
+  // The command keys on every session's page, after its info and settings. Max 7; the first two fit
+  // on the page's first screen, the rest are one press of the right arrow away.
   //   text    typed exactly as written (a trailing space is kept)
   //   submit  press Return afterwards
   //   key     "escape" interrupts instead of typing
   //   color   "green" | "amber" | "red" | "coral" | "purple", default neutral
-  // While the target session is blocked on a permission prompt or a multiple-choice question, the
-  // last free keys on its page (this row, plus any blank tiles before it) become the answers.
+  // The same keys are published under "Commands" in Options+ for your home page.
   "keys": [
     { "label": "esc",      "key": "escape" },
+    { "label": "/compact", "text": "/compact ", "submit": false },
     { "label": "continue", "text": "continue", "submit": true },
-    { "label": "/compact", "text": "/compact ", "submit": false }
+    { "label": "/clear",   "text": "/clear",   "submit": false, "color": "red" }
   ]
 }
