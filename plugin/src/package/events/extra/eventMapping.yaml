@@ -1,0 +1,7 @@
+haptics:
+    needsAttention:
+        DEFAULT: knock
+    turnDone:
+        DEFAULT: completed
+    sessionError:
+        DEFAULT: angry_alert

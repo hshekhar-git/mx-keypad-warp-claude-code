@@ -1,0 +1,45 @@
+{
+  // What a session tile says under the project name:
+  //   "title"  - Claude Code's own title for the session, falling back to your last prompt
+  //   "prompt" - always your last prompt
+  //   "slug"   - the session slug Warp shows on the tab
+  "label": "title",
+
+  // The gauge along the top of each tile: how full the context window is. Yellow past 80%.
+  "showContext": true,
+
+  // Window size used for the gauge. Matched by substring against the model id; anything unmatched
+  // uses contextWindow, and a session already past 200k is assumed to be on a 1M window.
+  "contextWindow": 200000,
+  "contextWindows": { "fable": 1000000, "mythos": 1000000 },
+
+  // Buzzes on an MX Master 4 (remappable per event in Options+ > Haptic feedback).
+  // A turn shorter than minTurnSeconds finishing is not announced - you are still watching it.
+  "haptics": { "attention": true, "done": true, "error": true, "minTurnSeconds": 20 },
+
+  // The App Switcher folder.
+  //   pinned         bundle ids that always come first, in this order - keys you can learn
+  //   hidden         bundle ids never shown
+  //   order          everything else: "recent" (like Cmd-Tab), "launch" or "name"
+  //   closeOnSwitch  leave the folder once you have picked, like Cmd-Tab does
+  "apps": {
+    "pinned": ["dev.warp.Warp-Stable"],
+    "hidden": [],
+    "order": "recent",
+    "closeOnSwitch": true
+  },
+
+  // The command row at the bottom of every page. Session tiles get the other (8 - keys) slots, so
+  // fewer keys means more sessions per page; [] gives all eight to sessions. Max 7.
+  //   text    typed exactly as written (a trailing space is kept)
+  //   submit  press Return afterwards
+  //   key     "escape" interrupts instead of typing
+  //   color   "green" | "amber" | "red" | "coral" | "purple", default neutral
+  // While the target session is blocked on a permission prompt or a multiple-choice question, the
+  // last free keys on its page (this row, plus any blank tiles before it) become the answers.
+  "keys": [
+    { "label": "esc",      "key": "escape" },
+    { "label": "continue", "text": "continue", "submit": true },
+    { "label": "/compact", "text": "/compact ", "submit": false }
+  ]
+}

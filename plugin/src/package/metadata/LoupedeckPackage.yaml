@@ -1,0 +1,25 @@
+type: plugin4
+name: ClaudeDeck
+displayName: Claude Deck
+description: |
+  Live status tiles for every Claude Code session on the MX Creative Keypad: jump to a session,
+  answer its permission prompts, interrupt it, and feel it finish on an MX Master 4.
+pluginFileName: ClaudeDeckPlugin.dll
+version: 1.0.0
+author: himanshu
+copyright: Copyright © 2026. MIT licensed.
+
+# macOS only: focus goes through URL schemes and `open`, typing through System Events.
+pluginFolderMac: bin
+
+supportedDevices:
+    - MxCreativeKeypad
+
+pluginCapabilities:
+    - HasNoApplication
+    - HasHapticMapping
+
+# 6.4 is the first Logi Plugin Service on the .NET 10 runtime.
+minimumLoupedeckVersion: 6.4
+
+license: MIT

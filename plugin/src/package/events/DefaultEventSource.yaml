@@ -1,0 +1,12 @@
+displayName: Claude Deck
+description: What your Claude Code sessions are doing
+events:
+    - name: needsAttention
+      displayName: Claude needs you
+      description: A Claude Code session is blocked on a permission prompt, a question or a plan
+    - name: turnDone
+      displayName: Claude finished
+      description: A Claude Code session finished a long turn
+    - name: sessionError
+      displayName: Claude errored
+      description: A Claude Code session stopped on an error

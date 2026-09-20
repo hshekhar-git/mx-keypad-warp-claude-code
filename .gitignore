@@ -1,0 +1,4 @@
+plugin/bin/
+plugin/obj/
+.DS_Store
+*.lplug4
