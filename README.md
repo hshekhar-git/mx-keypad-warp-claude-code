@@ -4,10 +4,6 @@ Every running [Claude Code](https://claude.com/claude-code) session as a live ti
 Creative Keypad** — jump to it, answer its permission prompts, interrupt it — and a buzz on an
 **MX Master 4** when one needs you.
 
-Inspired by [pffan91/claudewarp-keypad-mx](https://github.com/pffan91/claudewarp-keypad-mx) (MIT),
-which worked out the hard parts: Warp's `warp://session/<uuid>` deep link, its SQLite tab layout, and
-the 8-tiles-per-page rule. This is a separate implementation that goes further.
-
 ## Quick start
 
 ```sh
