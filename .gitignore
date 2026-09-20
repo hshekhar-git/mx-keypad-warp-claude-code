@@ -2,3 +2,4 @@ plugin/bin/
 plugin/obj/
 .DS_Store
 *.lplug4
+plugin/build.log

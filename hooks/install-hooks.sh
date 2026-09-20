@@ -3,7 +3,8 @@
 #
 # Additive and idempotent: every entry it writes runs deck-hook.sh, and it removes its own previous
 # entries first, so re-running never stacks duplicates and other tools' hooks are left untouched.
-# The previous settings.json is kept as settings.json.claudedeck.bak.
+# settings.json as it was BEFORE the first install is kept as settings.json.claudedeck.bak; re-running
+# does not overwrite that with a copy that already has these hooks in it.
 
 set -eu
 
@@ -19,7 +20,14 @@ mkdir -p "$(dirname "$SETTINGS")"
 [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
 jq -e 'type == "object"' "$SETTINGS" >/dev/null || { echo "$SETTINGS is not a JSON object; leaving it alone" >&2; exit 1; }
 
-cp "$SETTINGS" "$SETTINGS.claudedeck.bak"
+# Work from a scratch copy; the .bak is only (re)written when the file does not have our hooks yet,
+# so it always holds the last version of settings.json that was free of them.
+SRC="$SETTINGS.claudedeck.src"
+cp "$SETTINGS" "$SRC"
+trap 'rm -f "$SRC" "$SETTINGS.tmp"' EXIT
+if ! grep -q "$TAG" "$SETTINGS"; then
+  cp "$SETTINGS" "$SETTINGS.claudedeck.bak"
+fi
 
 # Drop every hook that runs our script, then any matcher group and event left empty by that.
 STRIP='
@@ -35,9 +43,9 @@ STRIP='
   else . end'
 
 if [ "${1:-}" = "--uninstall" ]; then
-  jq --arg tag "$TAG" "$STRIP | if .hooks == {} then del(.hooks) else . end" "$SETTINGS.claudedeck.bak" > "$SETTINGS.tmp"
+  jq --arg tag "$TAG" "$STRIP | if .hooks == {} then del(.hooks) else . end" "$SRC" > "$SETTINGS.tmp"
   mv "$SETTINGS.tmp" "$SETTINGS"
-  echo "Removed ClaudeDeck hooks from $SETTINGS (backup: $SETTINGS.claudedeck.bak)"
+  echo "Removed the keypad hooks from $SETTINGS"
   exit 0
 fi
 
@@ -68,9 +76,9 @@ jq --arg tag "$TAG" --arg hook "$HOOK" --argjson spec "$SPEC" "$STRIP"'
           .[$s.event] = ((.[$s.event] // []) + [{
             matcher: $s.matcher,
             hooks: [{type: "command", command: ("\"" + $hook + "\" " + $s.arg), timeout: 5}]
-          }])))' "$SETTINGS.claudedeck.bak" > "$SETTINGS.tmp"
+          }])))' "$SRC" > "$SETTINGS.tmp"
 mv "$SETTINGS.tmp" "$SETTINGS"
 
 echo "Wired $(printf '%s\n' "$EVENTS" | wc -l | tr -d ' ') Claude Code events to $HOOK"
-echo "Backup: $SETTINGS.claudedeck.bak"
+echo "Pre-install backup: $SETTINGS.claudedeck.bak"
 echo "Sessions started from now on report themselves; running ones need a restart (or /hooks review)."

@@ -8,6 +8,19 @@ Inspired by [pffan91/claudewarp-keypad-mx](https://github.com/pffan91/claudewarp
 which worked out the hard parts: Warp's `warp://session/<uuid>` deep link, its SQLite tab layout, and
 the 8-tiles-per-page rule. This is a separate implementation that goes further.
 
+## Quick start
+
+```sh
+brew install dotnet
+git clone https://github.com/hshekhar-git/mx-keypad-warp-claude-code.git
+cd mx-keypad-warp-claude-code
+./install.sh
+```
+
+Then drag the keys onto your keypad in Logi Options+ and grant Accessibility - the
+[full walkthrough](#install) has every step, a way to check it works, and
+[troubleshooting](#troubleshooting).
+
 ## What a tile tells you
 
 ```
@@ -85,22 +98,131 @@ quits, activates or hides - nothing polls - and exits by itself when the plugin 
 
 ## Install
 
+### What you need
+
+| | |
+|---|---|
+| **macOS** | Apple Silicon or Intel. Focus and typing use macOS APIs, so there is no Windows build |
+| **Logitech MX Creative Keypad** | plugged in and showing up in Logi Options+ |
+| **Logi Options+** with Logi Plugin Service **6.4 or newer** | 6.4 is the first release on .NET 10. Check: *Options+ → Settings → About*, or run `./install.sh --check` |
+| **[Claude Code](https://claude.com/claude-code)** | the `claude` CLI |
+| **[Warp](https://www.warp.dev)** | for exact-pane focus. Other terminals work, with app-level focus only |
+| **Homebrew** | to install the two build tools below |
+| *optional:* **MX Master 4** | for the haptic buzz |
+
+### Step 1 — build tools (once)
+
 ```sh
-brew install dotnet                 # .NET 10 SDK, no sudo (swiftc from the Xcode CLT builds the helper)
-source env.sh
-dotnet build plugin/src/ClaudeDeckPlugin.csproj -c Release   # builds, links into Logi Plugin Service, reloads
-hooks/install-hooks.sh              # wires 11 events into ~/.claude/settings.json (backup kept)
+brew install dotnet          # .NET 10 SDK - no sudo needed (the dotnet-sdk cask wants sudo; this does not)
+xcode-select --install       # Swift compiler, for the app-switcher helper. Skip if Xcode or the CLT is installed
 ```
 
-Then in **Logi Options+** → your keypad → *MX Keypad Warp Claude Code*: drag **Claude Sessions**, **Needs me**,
-**Working** and **Allow** onto keys. For haptics: MX Master 4 → *Haptic feedback* → enable
-MX Keypad Warp Claude Code.
+`jq` ships with macOS 15 and later. On anything older: `brew install jq`.
 
-The typing keys need **System Settings → Privacy & Security → Accessibility → Logi Plugin Service**.
-Status, colours and focusing work without it.
+### Step 2 — get the code and install
 
-Undo: `hooks/install-hooks.sh --uninstall` removes only its own entries;
-`dotnet build … -t:Clean` removes the plugin link.
+```sh
+git clone https://github.com/hshekhar-git/mx-keypad-warp-claude-code.git
+cd mx-keypad-warp-claude-code
+./install.sh
+```
+
+`install.sh` does four things and tells you which one failed if one does:
+
+1. **Checks prerequisites** — macOS, Logi Plugin Service version, .NET 10, swiftc, jq, Claude Code, Warp.
+2. **Builds** the plugin DLL and the native `deck-apps` helper, and writes a `.link` file into
+   `~/Library/Application Support/Logi/LogiPluginService/Plugins/` pointing at this folder.
+3. **Wires 11 Claude Code hooks** into `~/.claude/settings.json`. Additive: your other hooks are not
+   touched, the pre-install file is kept as `settings.json.claudedeck.bak`, and re-running never
+   stacks duplicates. It also copies the hook to `~/.claude/deck/deck-hook.sh` and seeds
+   `~/.claude/deck/config.json`.
+4. **Loads the plugin** and waits until it sees it running.
+
+> **Keep the folder where you cloned it.** The plugin runs from here. If you move or rename the
+> folder, run `./install.sh` again - it notices and restarts Logi Plugin Service for you.
+
+### Step 3 — put the keys on your keypad
+
+Open **Logi Options+ → MX Creative Keypad**. In the actions panel find the plugin
+**MX Keypad Warp Claude Code** and drag these onto keys:
+
+| Drag this | Group | Put it |
+|---|---|---|
+| **Claude Sessions** | Claude | any home-page key - it is a folder; pressing it opens the deck |
+| **App Switcher** | Apps | any home-page key - also a folder |
+| **Needs me**, **Working**, **Allow** | Claude | home page - they are live status keys |
+| *optional:* **Open App** | Apps | a direct "go to Warp" key: type `Warp` in its form |
+| *optional:* anything under **Commands**, or **Send to Claude** | Commands / Claude | home page |
+
+### Step 4 — allow typing
+
+Needed only by keys that type: `esc`, `/compact`, **yes / always / no**, **Allow**, holding a tile to
+interrupt. Status, colours, the app switcher and jumping to a pane work without it.
+
+**System Settings → Privacy & Security → Accessibility →** enable **Logi Plugin Service**.
+(If it is not listed, press a typing key once - macOS adds the entry when the first keystroke is
+blocked - or add `/Applications/Utilities/LogiPluginService.app` with the **+** button.)
+
+### Step 5 — haptics (MX Master 4 only)
+
+**Logi Options+ → MX Master 4 → Haptic feedback →** enable **MX Keypad Warp Claude Code**. The three
+events (*Claude needs you*, *Claude finished*, *Claude errored*) can each be given a different
+waveform there.
+
+### Step 6 — check that it works
+
+1. Open a **new** Warp tab and run `claude`. Hooks are read when a session starts, so sessions that
+   were already running only show up on their next tool call.
+2. Press **Claude Sessions** on the keypad. You should see a **grey** tile named after the folder.
+3. Send a prompt. The tile turns **coral** with a moving bar and shows the tool in use.
+4. When Claude finishes it turns **green**; *Needs me* on your home page shows `1`.
+5. Click into another app, press **App Switcher**, press **Warp** - Warp comes forward and the folder
+   closes.
+6. Ask Claude to run something it needs permission for (`run ls in /tmp`). The tile blinks **red** and
+   shows the command; the bottom keys become **yes / always / no**.
+
+No tile? `ls ~/.claude/deck/sessions/` should hold one `.json` per running session. If it is empty
+the hooks are not firing - see below.
+
+### Updating
+
+```sh
+git pull && ./install.sh
+```
+
+### Uninstalling
+
+```sh
+./install.sh --uninstall     # removes the hooks and the plugin link, restarts Logi Plugin Service
+rm -rf ~/.claude/deck        # optional: config, cached icons, session files
+```
+
+### Doing it by hand
+
+`install.sh` is only these three commands plus checks:
+
+```sh
+source env.sh                                                  # points DOTNET_ROOT at Homebrew's dotnet
+dotnet build plugin/src/ClaudeDeckPlugin.csproj -c Release     # build + link + reload
+hooks/install-hooks.sh                                         # wire the hooks
+```
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| The plugin is not in the Options+ action list | It did not load. Quit and reopen `/Applications/Utilities/LogiPluginService.app`, then look at `~/Library/Application Support/Logi/LogiPluginService/Logs/plugin_logs/ClaudeDeck.log` |
+| Log says `Cannot load plugin ... because plugin 'ClaudeDeck' is already loaded` | Harmless on its own - the service enumerates plugins twice and stock plugins log the same line. It only matters right after **moving the folder**: the old copy is still in memory. Run `./install.sh` again, or restart Logi Plugin Service |
+| Log says `Cannot load plugin from '<path>.dll'` | `PluginApi.dll` ended up in the build output. It must never ship; the project already sets `<Private>false</Private>`, so run `dotnet build ... -t:Clean` and build again |
+| `dotnet: command not found`, or *"You must install .NET"* | `brew install dotnet`, and build through `./install.sh` (or `source env.sh` first): Homebrew's dotnet needs `DOTNET_ROOT` set |
+| Build fails at `swiftc` | `xcode-select --install` |
+| Folder opens but shows **Not set up** | The hooks are not in `~/.claude/settings.json`. Run `hooks/install-hooks.sh` |
+| Folder shows **No sessions** while Claude is running | That session started before the hooks were installed - start a new one. Also confirm `jq` exists: the hook exits silently without it |
+| Tiles work, but `esc` / `yes` / `/compact` do nothing | Accessibility permission (Step 4). After an Options+ update macOS sometimes drops it: toggle the entry off and on |
+| A key types nothing and the log says `... is in front, not ...` | Working as designed: typing keys refuse unless the expected terminal is frontmost. Press the session tile first |
+| App Switcher shows **No apps** | The helper is not running: `pgrep -fl deck-apps`. Rebuild with `./install.sh`; the log says why if it cannot start |
+| All Warp sessions land on one page | Warp changed its internal database layout. Status and focus still work; only per-tab paging is lost. Please open an issue |
+| No buzz on the MX Master 4 | Step 5, and check `"haptics"` in `~/.claude/deck/config.json`. *Claude finished* only fires for turns longer than `minTurnSeconds` (20) |
 
 ## Configuration
 
