@@ -10,7 +10,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     // LIST   every session as a live tile - eight to a page (or one page per Warp tab, by config).
     //        Press one to open it; hold one to interrupt it without going in.
     //
-    // PAGE   one session: a way back, its live tile (press = jump to its pane), its facts (context,
+    // PAGE   one session: a way back (which also reports on everyone else - see below), its live tile (press = jump to its pane), its facts (context,
     //        branch, turns, age), its settings (model, effort, permission mode - tap to step), then
     //        your command keys. While it is blocked on a prompt the keypad can answer, the answers
     //        come first, straight after the tile.
@@ -56,6 +56,24 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static SessionStore Store => SessionStore.Instance;
 
         private SessionInfo Page => Store.Find(this._page);
+
+        private List<SessionInfo> Others => Store.All.Where(s => s.Key != this._page).ToList();
+
+        // Who most deserves you next: blocked longest, else errored, else finished longest ago.
+        private SessionInfo Neediest()
+        {
+            var others = this.Others;
+            foreach (var state in new[] { "attention", "error", "done" })
+            {
+                var hit = others.Where(s => s.State == state).OrderBy(s => s.Since).FirstOrDefault();
+                if (hit != null)
+                {
+                    return hit;
+                }
+            }
+
+            return null;
+        }
 
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
             PluginDynamicFolderNavigation.ButtonArea;
@@ -237,6 +255,12 @@ namespace Loupedeck.ClaudeDeckPlugin
                     this.CommandImageChanged("p:tile");
                 }
 
+                // Somebody else is blocked: the way back blinks until they are not.
+                if (this.Others.Any(o => o.State == "attention"))
+                {
+                    this.CommandImageChanged("p:back");
+                }
+
                 return;
             }
 
@@ -261,6 +285,35 @@ namespace Loupedeck.ClaudeDeckPlugin
         // Holding a session - its tile in the list, or the tile on its page - interrupts it.
         public override Boolean ProcessButtonEvent2(String actionParameter, DeviceButtonEvent2 buttonEvent)
         {
+            // Holding the way back skips the list and goes straight to whoever needs you most.
+            if (actionParameter == "p:back")
+            {
+                switch (buttonEvent.EventType)
+                {
+                    case DeviceButtonEventType.LongPress:
+                        this._held = actionParameter;
+                        var next = this.Neediest();
+                        if (next != null)
+                        {
+                            if (DeckConfig.FocusOnOpen)
+                            {
+                                Deck.Focus(next);
+                            }
+
+                            this.Show(next.Key);
+                        }
+
+                        return true;
+                    case DeviceButtonEventType.RepeatPress:
+                        return true;
+                    case DeviceButtonEventType.Release when this._held == actionParameter:
+                        this._held = null;
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+
             var session = this.SessionFor(actionParameter);
             if (session == null)
             {
@@ -423,8 +476,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var page = this.Page;
             if (actionParameter == "p:back")
             {
-                var others = Store.All.Where(s => s.Key != this._page).ToList();
-                return TileRenderer.Back(others.Count, others.Count(s => s.State == "attention"), flash, imageSize);
+                return TileRenderer.Back(this.Others, flash, imageSize, this._frame);
             }
 
             if (page == null)

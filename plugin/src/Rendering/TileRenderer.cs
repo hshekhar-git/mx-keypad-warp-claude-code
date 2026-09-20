@@ -1,6 +1,8 @@
 namespace Loupedeck.ClaudeDeckPlugin
 {
     using System;
+    using System.Collections.Generic;
+    using System.Linq;
 
     // Everything drawn on a key. A tile is filled with its state colour so the deck reads from across
     // the room; the text is for when you are close enough to care which session it is.
@@ -292,14 +294,62 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static String Tokens(Int64 n) =>
             n >= 1_000_000 ? $"{n / 1_000_000.0:0.#}M" : n >= 1000 ? $"{n / 1000}k" : n.ToString();
 
-        public static BitmapImage Back(Int32 others, Int32 waiting, Boolean flash, PluginImageSize size)
+        // The way back up from a session's page - and, because it is the one key on that page that is
+        // about everybody else, the place the other sessions get to tap you on the shoulder.
+        //
+        // Blocked on you beats finished beats merely there: red and blinking with the session's name,
+        // green with a count, or quiet. Underneath, one dot per other session in its state colour, so
+        // the whole deck is readable without leaving the page.
+        public static BitmapImage Back(IReadOnlyList<SessionInfo> others, Boolean flash, PluginImageSize size, Int32 frame)
         {
             using var b = new BitmapBuilder(size);
+            var w = b.Width;
             var h = b.Height;
-            b.Clear(waiting > 0 ? Shade(Attention, 0.25) : Empty);
-            b.DrawText("‹ sessions", 2, (Int32)(h * 0.24), b.Width - 4, (Int32)(h * 0.30), BitmapColor.White, 15);
-            var note = waiting > 0 ? $"{waiting} need{(waiting == 1 ? "s" : "")} you" : others > 0 ? $"{others} other{(others == 1 ? "" : "s")}" : "";
-            b.DrawText(note, 2, (Int32)(h * 0.58), b.Width - 4, (Int32)(h * 0.20), Tint(Empty, 0.65), 11);
+
+            var waiting = others.Where(s => s.State == "attention").OrderBy(s => s.Since).ToList();
+            var finished = others.Count(s => s.State is "done" or "error");
+
+            BitmapColor bg;
+            String note;
+            if (waiting.Count > 0)
+            {
+                bg = (frame / BlinkFrames) % 2 == 1 ? Shade(Attention, 0.5) : Attention;
+                note = waiting.Count == 1 ? $"{Middle(Or(waiting[0].Project, "one"), 12)} needs you" : $"{waiting.Count} need you";
+            }
+            else if (finished > 0)
+            {
+                bg = Shade(Done, 0.35);
+                note = $"{finished} your turn";
+            }
+            else
+            {
+                bg = Empty;
+                note = others.Count == 0 ? "" : others.Count == 1 ? "1 other" : $"{others.Count} others";
+            }
+
+            b.Clear(bg);
+            b.DrawText("‹ sessions", 2, (Int32)(h * 0.10), w - 4, (Int32)(h * 0.28), BitmapColor.White, 15);
+            b.DrawText(note, 2, (Int32)(h * 0.38), w - 4, (Int32)(h * 0.30), waiting.Count > 0 ? BitmapColor.White : Tint(bg, 0.7), 11);
+
+            var shown = others.Take(8).ToList();
+            if (shown.Count > 0)
+            {
+                var r = Math.Max(4, (Int32)(w * 0.04));
+                var gap = r;
+                var total = (shown.Count * 2 * r) + ((shown.Count - 1) * gap);
+                var x = ((w - total) / 2) + r;
+                var y = (Int32)(h * 0.85);
+
+                // On a dark strip of their own: a red dot on a red key is no dot at all.
+                var band = (Int32)(h * 0.30);
+                b.FillRectangle(0, h - band, w, band, Empty);
+                foreach (var o in shown)
+                {
+                    b.FillCircle(x, y, r, o.IsLimited ? Amber : StateColor(o.State));
+                    x += (2 * r) + gap;
+                }
+            }
+
             if (flash)
             {
                 DrawFlash(b);

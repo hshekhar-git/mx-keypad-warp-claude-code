@@ -24,8 +24,8 @@ that session's own page:**
 
 ```
 ┌───────────┬───────────┬───────────┐
-│  ‹ Back   │ ‹ sessions│  the tile │   ‹ sessions  up one level; turns red and says "1 needs you"
-│ (Options+)│ 2 others  │ Edit 2:31 │                 when another session is blocked
+│  ‹ Back   │ ‹ sessions│  the tile │   ‹ sessions  up one level - and the other sessions' way of
+│ (Options+)│  ● ● ●    │ Edit 2:31 │                 tapping you on the shoulder (see below)
 ├───────────┼───────────┼───────────┤   the tile    live; press = jump to its pane, hold = interrupt
 │  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
 │ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch)
@@ -38,6 +38,13 @@ that session's own page:**
 
 While the session is **blocked**, the answers come first, straight after the tile: **yes / always / no**
 for a permission prompt, the **actual option labels** for a multiple-choice question.
+
+**While you are inside one session, the `‹ sessions` key watches the rest.** It blinks **red** with
+the name - `web-app needs you` - when another session is blocked on you (`2 need you` for several),
+turns **green** with `2 your turn` when others have finished, and otherwise just counts them. Along
+its bottom edge is one dot per other session in its state colour, so the whole deck is readable
+without leaving the page. **Press** it for the list; **hold** it to skip the list and land directly on
+whichever session needs you most (blocked longest, else errored, else finished longest ago).
 
 **Out of usage** - when a session hits your usage limit its tile turns **amber** and reads
 `limit · 4:40am` (when it lifts), and its page gains a **continue at low priority** key, which sends
