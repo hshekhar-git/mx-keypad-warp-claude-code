@@ -3,6 +3,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Text.Json;
     using System.Threading;
 
@@ -19,6 +20,24 @@ namespace Loupedeck.ClaudeDeckPlugin
         public String Color { get; init; } = "";
 
         public Boolean IsEscape => String.Equals(this.Key, "escape", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public sealed class ModelDef
+    {
+        // What the key shows.
+        public String Label { get; init; } = "";
+
+        // What is typed after "/model ": an alias (opus) or a full id (claude-opus-5[1m]).
+        public String Alias { get; init; } = "";
+
+        // Matched, case-insensitively, against the session's model name to tell which is current.
+        public String Match { get; init; } = "";
+
+        public String Color { get; init; } = "";
+
+        public Boolean Is(ModelName current) =>
+            current != null && current.IsKnown
+            && current.Name.Contains(this.Match.Length > 0 ? this.Match : this.Alias, StringComparison.OrdinalIgnoreCase);
     }
 
     // ~/.claude/deck/config.json, re-read within a second of being saved. A file that fails to parse
@@ -69,6 +88,9 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         // A switcher is a picker: once you have picked, it gets out of the way.
         public static Boolean CloseOnSwitch => _current.CloseOnSwitch;
+
+        // The models the Model key steps through and the Models folder lists.
+        public static IReadOnlyList<ModelDef> Models => _current.Models;
 
         public static Int32 ContextWindowFor(String model, Int64 observed)
         {
@@ -173,6 +195,13 @@ namespace Loupedeck.ClaudeDeckPlugin
             public IReadOnlyList<String> HiddenApps { get; private set; } = Array.Empty<String>();
             public String AppOrder { get; private set; } = "recent";
             public Boolean CloseOnSwitch { get; private set; } = true;
+            public IReadOnlyList<ModelDef> Models { get; private set; } = new List<ModelDef>
+            {
+                new() { Label = "Fable", Alias = "fable", Color = "violet" },
+                new() { Label = "Opus", Alias = "opus", Color = "coral" },
+                new() { Label = "Sonnet", Alias = "sonnet", Color = "blue" },
+                new() { Label = "Haiku", Alias = "haiku", Color = "green" },
+            };
 
             public static Snapshot Default() => new();
 
@@ -248,6 +277,34 @@ namespace Loupedeck.ClaudeDeckPlugin
                     if (apps.TryGetProperty("hidden", out var hidden) && hidden.ValueKind == JsonValueKind.Array)
                     {
                         s.HiddenApps = Strings(hidden);
+                    }
+                }
+
+                if (root.TryGetProperty("models", out var models) && models.ValueKind == JsonValueKind.Array)
+                {
+                    var list = new List<ModelDef>();
+                    foreach (var m in models.EnumerateArray())
+                    {
+                        // Typed into a terminal, so an alias is held to what a model name looks like.
+                        var alias = m.ValueKind == JsonValueKind.Object ? Str(m, "alias") : "";
+                        if (alias.Length == 0 || alias.Length > 80
+                            || !System.Text.RegularExpressions.Regex.IsMatch(alias, @"^[A-Za-z0-9][A-Za-z0-9._\-\[\]]*$"))
+                        {
+                            continue;
+                        }
+
+                        list.Add(new ModelDef
+                        {
+                            Alias = alias,
+                            Label = Str(m, "label") is { Length: > 0 } l ? l : alias,
+                            Match = Str(m, "match"),
+                            Color = Str(m, "color"),
+                        });
+                    }
+
+                    if (list.Count > 0)
+                    {
+                        s.Models = list.Take(8).ToList();
                     }
                 }
 

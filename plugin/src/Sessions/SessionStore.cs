@@ -40,6 +40,9 @@ namespace Loupedeck.ClaudeDeckPlugin
         public String Title { get; set; } = "";
         public String Slug { get; set; } = "";
         public String Model { get; set; } = "";
+
+        // The model this session is set to right now, /model switches included.
+        public ModelName Selected { get; set; } = ModelName.Unknown;
         public Int64 ContextTokens { get; set; }
         public Int32 ContextWindow { get; set; }
 
@@ -389,7 +392,16 @@ namespace Loupedeck.ClaudeDeckPlugin
                 s.Slug = info.Slug;
                 s.Model = info.Model;
                 s.ContextTokens = info.ContextTokens;
-                s.ContextWindow = DeckConfig.ContextWindowFor(info.Model, info.ContextTokens);
+                s.Selected = ModelNames.Resolve(info.SwitchedTo, info.Model);
+
+                // More than 200k tokens in the window settles the question whatever the names say.
+                if (!s.Selected.OneM && s.Selected.IsKnown && info.ContextTokens > 200_000)
+                {
+                    s.Selected = new ModelName { Name = s.Selected.Name, OneM = true };
+                }
+                s.ContextWindow = s.Selected.OneM
+                    ? 1_000_000
+                    : DeckConfig.ContextWindowFor(info.Model, info.ContextTokens);
             }
         }
 
@@ -466,6 +478,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     .Append(s.Title).Append('\u001f')
                     .Append(s.Prompt).Append('\u001f')
                     .Append(s.Here ? '1' : '0').Append('\u001f')
+                    .Append(s.Selected.Name).Append(s.Selected.OneM ? "+" : "").Append('\u001f')
                     .Append(String.Join(",", s.Options)).Append('\u001f')
                     .Append((Int32)(s.ContextFill * 100)).Append('\u001e');
             }

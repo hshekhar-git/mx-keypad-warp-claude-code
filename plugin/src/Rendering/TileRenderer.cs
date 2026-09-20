@@ -16,6 +16,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static readonly BitmapColor Amber = new(0x8F, 0x62, 0x10);
         private static readonly BitmapColor Empty = new(0x14, 0x16, 0x18);
         private static readonly BitmapColor Warn = new(0xF2, 0xC9, 0x4C);
+        private static readonly BitmapColor Blue = new(0x2D, 0x6F, 0xB5);
+        private static readonly BitmapColor Violet = new(0x6B, 0x4F, 0xBB);
 
         public const Int32 TickMs = 250;
         private const Int32 SweepFrames = 10;
@@ -150,14 +152,17 @@ namespace Loupedeck.ClaudeDeckPlugin
                         "plan" => "plan ready",
                         _ => $"allow {Or(ToolName(s.Tool), "it")}?",
                     };
+                // A resting tile has room to say which model it is on; a working one does not.
                 case "done":
-                    return $"done {Elapsed(now - s.Since)}";
+                    return $"done {Elapsed(now - s.Since)}{ModelTag(s)}";
                 case "error":
-                    return "error";
+                    return $"error{ModelTag(s)}";
                 default:
-                    return "idle";
+                    return $"idle{ModelTag(s)}";
             }
         }
+
+        private static String ModelTag(SessionInfo s) => s.Selected.IsKnown ? $" · {s.Selected.Short}" : "";
 
         public static String ToolName(String tool)
         {
@@ -214,15 +219,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static BitmapImage Command(BitmapBuilder b, String label, String color, Boolean flash)
         {
-            var bg = (color ?? "").ToLowerInvariant() switch
-            {
-                "green" => Done,
-                "amber" => Amber,
-                "red" => Attention,
-                "coral" => Busy,
-                "purple" => Error,
-                _ => Neutral,
-            };
+            var bg = Named(color);
             b.Clear(bg);
             // Answer keys carry whole option labels, so long text wraps in a taller box at a smaller size.
             if (label.Length > 10)
@@ -232,6 +229,63 @@ namespace Loupedeck.ClaudeDeckPlugin
             else
             {
                 b.DrawText(label, 2, (Int32)(b.Height * 0.28), b.Width - 4, (Int32)(b.Height * 0.44), BitmapColor.White, label.Length > 7 ? 14 : 17);
+            }
+
+            if (flash)
+            {
+                DrawFlash(b);
+            }
+
+            return b.ToImage();
+        }
+
+        private static BitmapColor Named(String color) => (color ?? "").ToLowerInvariant() switch
+        {
+            "green" => Done,
+            "amber" => Amber,
+            "red" => Attention,
+            "coral" => Busy,
+            "purple" => Error,
+            "blue" => Blue,
+            "violet" => Violet,
+            _ => Neutral,
+        };
+
+        // ---- models -------------------------------------------------------------------------
+
+        // The Model key. At rest: the target session's model, filling the key in that model's colour.
+        // While stepping: the model about to be chosen, ringed in white, until the taps stop.
+        public static BitmapImage Model(String top, String name, String bottom, String color, Boolean ringed, Boolean dim, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var h = b.Height;
+            var bg = dim ? Empty : Named(color);
+            b.Clear(bg);
+            var soft = dim ? Tint(Empty, 0.5) : Tint(bg, 0.82);
+            b.DrawText(Middle(top, 15), 2, (Int32)(h * 0.05), b.Width - 4, (Int32)(h * 0.18), soft, 11);
+            b.DrawText(name, 2, (Int32)(h * 0.26), b.Width - 4, (Int32)(h * 0.42), dim ? Tint(Empty, 0.6) : BitmapColor.White, name.Length > 9 ? 15 : 19);
+            b.DrawText(bottom, 2, (Int32)(h * 0.74), b.Width - 4, (Int32)(h * 0.18), soft, 11);
+            if (ringed)
+            {
+                DrawFlash(b);
+            }
+
+            return b.ToImage();
+        }
+
+        // One entry in the Models folder; the one in use is ringed and says so.
+        public static BitmapImage ModelChoice(ModelDef model, Boolean current, Boolean flash, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var h = b.Height;
+            var bg = current ? Named(model.Color) : Shade(Named(model.Color), 0.55);
+            b.Clear(bg);
+            b.DrawText(model.Label, 2, (Int32)(h * 0.26), b.Width - 4, (Int32)(h * 0.40), current ? BitmapColor.White : Tint(bg, 0.75), model.Label.Length > 9 ? 15 : 19);
+            if (current)
+            {
+                b.DrawText("in use", 2, (Int32)(h * 0.72), b.Width - 4, (Int32)(h * 0.18), Tint(bg, 0.85), 11);
+                var barH = Math.Max(4, (Int32)(h * 0.05));
+                b.FillRectangle((Int32)(b.Width * 0.25), h - barH, (Int32)(b.Width * 0.5), barH, BitmapColor.White);
             }
 
             if (flash)

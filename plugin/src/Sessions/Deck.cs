@@ -126,6 +126,63 @@ namespace Loupedeck.ClaudeDeckPlugin
                 : TermInput.SendEscape(s.Bundle);
         }
 
+        // Which session a model switch should go to: the target, or the only one there is.
+        public static SessionInfo ModelTarget
+        {
+            get
+            {
+                var target = Target;
+                if (target != null)
+                {
+                    return target;
+                }
+
+                var all = SessionStore.Instance.All;
+                return all.Count == 1 ? all[0] : null;
+            }
+        }
+
+        // Switches a session's model by typing "/model <alias>" into it.
+        //
+        // Refused while the session is mid-turn or blocked on a prompt: text typed then is either
+        // queued as a message to Claude or lands in a dialog, and neither is a model switch.
+        public static Boolean SwitchModel(SessionInfo s, ModelDef model)
+        {
+            s = SessionStore.Instance.Find(s?.Key);
+            if (s == null || model == null)
+            {
+                return false;
+            }
+
+            if (s.State is "busy" or "attention")
+            {
+                PluginLog.Info($"model not switched: {s.Project} is {s.State}");
+                return false;
+            }
+
+            if (!Focus(s))
+            {
+                return false;
+            }
+
+            Thread.Sleep(FocusSettleMs);
+            PluginLog.Info($"switching {s.Project} to {model.Alias}");
+            if (!TermInput.TypeText(s.Bundle, $"/model {model.Alias}", true))
+            {
+                return false;
+            }
+
+            // The switch shows up in the transcript a moment later; look for it rather than waiting
+            // out the usual re-read interval.
+            var transcript = s.Transcript;
+            System.Threading.Tasks.Task.Delay(1500).ContinueWith(_ =>
+            {
+                TranscriptStats.Forget(transcript);
+                SessionStore.Instance.Poke();
+            });
+            return true;
+        }
+
         // Interrupts one specific session, wherever it is.
         public static Boolean Interrupt(SessionInfo s)
         {

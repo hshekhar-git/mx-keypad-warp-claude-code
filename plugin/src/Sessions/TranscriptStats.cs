@@ -12,6 +12,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         public String Slug { get; init; } = "";
         public String Model { get; init; } = "";
 
+        // The display name from a /model switch, when that is more recent than the last reply;
+        // empty otherwise. "Opus 5 (1M context)".
+        public String SwitchedTo { get; init; } = "";
+
         // Tokens in the context window as of the last main-thread assistant message.
         public Int64 ContextTokens { get; init; }
     }
@@ -106,6 +110,8 @@ namespace Loupedeck.ClaudeDeckPlugin
             var aiTitle = "";
             var slug = "";
             var model = "";
+            var switchedTo = "";
+            var modelSettled = false;
             Int64 tokens = -1;
 
             // Newest first, stopping as soon as everything has been seen once.
@@ -124,7 +130,9 @@ namespace Loupedeck.ClaudeDeckPlugin
                 var wantsTitle = (customTitle.Length == 0 && line.Contains("\"customTitle\"", StringComparison.Ordinal))
                     || (aiTitle.Length == 0 && line.Contains("\"aiTitle\"", StringComparison.Ordinal));
                 var wantsSlug = slug.Length == 0 && line.Contains("\"slug\"", StringComparison.Ordinal);
-                if (!wantsUsage && !wantsTitle && !wantsSlug)
+                var wantsSwitch = !modelSettled
+                    && (line.Contains("Set model to", StringComparison.Ordinal) || line.Contains("Kept model as", StringComparison.Ordinal));
+                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch)
                 {
                     continue;
                 }
@@ -153,6 +161,31 @@ namespace Loupedeck.ClaudeDeckPlugin
                         slug = Str(root, "slug");
                     }
 
+                    // Reading newest first, whichever of "a /model switch" and "a reply" turns up first
+                    // is the last word on which model is selected. The match is on the whole message,
+                    // not a substring, because a transcript can quote this very text.
+                    if (wantsSwitch
+                        && root.TryGetProperty("message", out var sm) && sm.ValueKind == JsonValueKind.Object
+                        && sm.TryGetProperty("content", out var sc0) && sc0.ValueKind == JsonValueKind.String)
+                    {
+                        var text = sc0.GetString() ?? "";
+                        foreach (var lead in new[] { "<local-command-stdout>Set model to ", "<local-command-stdout>Kept model as " })
+                        {
+                            if (text.StartsWith(lead, StringComparison.Ordinal))
+                            {
+                                var rest = text.Substring(lead.Length);
+                                var end = rest.IndexOf(" and saved", StringComparison.Ordinal);
+                                if (end < 0)
+                                {
+                                    end = rest.IndexOf("</local-command-stdout>", StringComparison.Ordinal);
+                                }
+
+                                switchedTo = (end >= 0 ? rest.Substring(0, end) : rest).Trim();
+                                modelSettled = true;
+                            }
+                        }
+                    }
+
                     // Subagent traffic shares the file but not the context window.
                     var sidechain = root.TryGetProperty("isSidechain", out var sc) && sc.ValueKind == JsonValueKind.True;
                     if (tokens < 0 && !sidechain
@@ -166,6 +199,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                         {
                             tokens = sum;
                             model = Str(msg, "model");
+                            modelSettled = true;
                         }
                     }
                 }
@@ -186,6 +220,10 @@ namespace Loupedeck.ClaudeDeckPlugin
                 Title = title.Length > 0 ? title : previous?.Title ?? "",
                 Slug = slug.Length > 0 ? slug : previous?.Slug ?? "",
                 Model = model.Length > 0 ? model : previous?.Model ?? "",
+
+                // Settled by a reply means any earlier switch is history; unsettled means the tail
+                // said nothing either way, so what was known before still stands.
+                SwitchedTo = modelSettled ? switchedTo : previous?.SwitchedTo ?? "",
                 ContextTokens = tokens >= 0 ? tokens : previous?.ContextTokens ?? 0,
             };
         }

@@ -59,6 +59,28 @@ its real icon. Press one and it comes to the front, and the folder closes itself
 Driven by a small native helper (`helper/deck-apps.swift`) that pushes a line when an app launches,
 quits, activates or hides - nothing polls - and exits by itself when the plugin goes away.
 
+## Model switch
+
+**Model** is a live key: it shows which model the target session is set to - `Fable 5.1`, with
+`1M context` underneath when it is on the big window - in that model's colour, and the project it
+belongs to. Resting tiles carry the same thing as a short tag: `done 5:12 · F5.1`.
+
+**Tap to change it.** Each tap steps to the next model in your list, ringed in white; the switch is
+sent once, about a second and a half after your last tap. So Fable → Sonnet, passing Opus, is *one*
+`/model`, not two - which matters, because Claude Code's `/model` also saves the choice as your
+default for new sessions. Tapping all the way round to the model already in use sends nothing.
+
+**Models** is the same thing as a folder: every model as a key, the one in use marked, press to set.
+
+- The status is read from the session's transcript: the most recent of "a `/model` switch" and "the
+  model that wrote the last reply". A switch shows up about a second after it is made.
+- A switch is refused - the key says `busy - wait` - while the session is mid-turn or blocked on a
+  prompt, because text typed then would be queued as a message or land in a dialog.
+- It acts on the **target session** (the pane you are in, else the tile you last pressed); with
+  exactly one session running, that one.
+- The list is `models` in `config.json`. The defaults type `fable`, `opus`, `sonnet`, `haiku`; put a
+  full id such as `claude-opus-5[1m]` in `alias` if you want a specific version or window.
+
 ## Keys
 
 **Inside the *Claude Sessions* folder**
@@ -79,6 +101,7 @@ quits, activates or hides - nothing polls - and exits by itself when the plugin 
 | **Needs me** | count of sessions blocked on you — else errored, else finished, else working | cycles through exactly the sessions it counts, longest-waiting first |
 | **Working** | how many are still running | cycles through them |
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
+| **Model** | the target session's model, and whether it is on the 1M window | steps to the next model; commits when you stop tapping |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |
 
@@ -150,7 +173,8 @@ Open **Logi Options+ → MX Creative Keypad**. In the actions panel find the plu
 |---|---|---|
 | **Claude Sessions** | Claude | any home-page key - it is a folder; pressing it opens the deck |
 | **App Switcher** | Apps | any home-page key - also a folder |
-| **Needs me**, **Working**, **Allow** | Claude | home page - they are live status keys |
+| **Needs me**, **Working**, **Allow**, **Model** | Claude | home page - they are live status keys |
+| *optional:* **Models** | Claude | a folder: pick a model from a list instead of tapping through |
 | *optional:* **Open App** | Apps | a direct "go to Warp" key: type `Warp` in its form |
 | *optional:* anything under **Commands**, or **Send to Claude** | Commands / Claude | home page |
 
@@ -222,6 +246,8 @@ hooks/install-hooks.sh                                         # wire the hooks
 | A key types nothing and the log says `... is in front, not ...` | Working as designed: typing keys refuse unless the expected terminal is frontmost. Press the session tile first |
 | App Switcher shows **No apps** | The helper is not running: `pgrep -fl deck-apps`. Rebuild with `./install.sh`; the log says why if it cannot start |
 | All Warp sessions land on one page | Warp changed its internal database layout. Status and focus still work; only per-tab paging is lost. Please open an issue |
+| **Model** shows `?` | No reply has been written in that session yet and no `/model` switch was made, so there is nothing to read. It fills in after the first turn |
+| A model switch types `/model x` but Claude Code rejects it | That alias is not one your Claude Code version knows. Put the full model id in `alias` in `config.json` |
 | No buzz on the MX Master 4 | Step 5, and check `"haptics"` in `~/.claude/deck/config.json`. *Claude finished* only fires for turns longer than `minTurnSeconds` (20) |
 
 ## Configuration

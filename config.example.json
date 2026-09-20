@@ -8,14 +8,28 @@
   // The gauge along the top of each tile: how full the context window is. Yellow past 80%.
   "showContext": true,
 
-  // Window size used for the gauge. Matched by substring against the model id; anything unmatched
-  // uses contextWindow, and a session already past 200k is assumed to be on a 1M window.
+  // Window size used for the gauge. A session known to be on a 1M window (from its /model switch, or
+  // from the "[1m]" on your default model) uses 1,000,000. Otherwise: matched by substring against
+  // the model id, else contextWindow; and anything already past 200k is assumed to be on 1M.
   "contextWindow": 200000,
-  "contextWindows": { "fable": 1000000, "mythos": 1000000 },
+  "contextWindows": {},
 
   // Buzzes on an MX Master 4 (remappable per event in Options+ > Haptic feedback).
   // A turn shorter than minTurnSeconds finishing is not announced - you are still watching it.
   "haptics": { "attention": true, "done": true, "error": true, "minTurnSeconds": 20 },
+
+  // The Model key and the Models folder.
+  //   alias  typed after "/model " - an alias (opus) or a full id (claude-opus-5[1m])
+  //   label  what the key shows (defaults to the alias)
+  //   match  text looked for in the session's model name to tell which one is in use (defaults to alias)
+  //   color  "violet" | "blue" | "coral" | "green" | "amber" | "red" | "purple"
+  // Note: Claude Code's /model also saves the choice as your default for new sessions.
+  "models": [
+    { "label": "Fable",  "alias": "fable",  "color": "violet" },
+    { "label": "Opus",   "alias": "opus",   "color": "coral"  },
+    { "label": "Sonnet", "alias": "sonnet", "color": "blue"   },
+    { "label": "Haiku",  "alias": "haiku",  "color": "green"  }
+  ],
 
   // The App Switcher folder.
   //   pinned         bundle ids that always come first, in this order - keys you can learn

@@ -106,6 +106,8 @@ ok "config at ~/.claude/deck/config.json"
 echo; bold "4/4  Loading the plugin"
 
 CURRENT="$(cat "$LINK" 2>/dev/null | tr -d '\r\n')"
+HELPER="$HERE/plugin/bin/Release/bin/deck-apps watch"
+BEFORE="$(pgrep -f "$HELPER" | sort | tr '\n' ' ')"
 if ! pgrep -x LogiPluginService >/dev/null; then
   open "$SERVICE_APP"; ok "started Logi Plugin Service"
 elif [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$CURRENT" ]; then
@@ -116,11 +118,13 @@ else
   open "loupedeck:plugin/ClaudeDeck/reload" 2>/dev/null; ok "asked the service to reload the plugin"
 fi
 
-# The helper is started by the plugin's own Load(), so seeing it run from THIS folder is proof that
-# the service loaded THIS build.
+# The helper is started by the plugin's own Load(), so a helper running from THIS folder is proof the
+# service loaded THIS build - provided it is a new process. One left over from before the reload
+# proves nothing, so its pid has to have changed.
 LOADED=0
-for _ in $(seq 1 25); do
-  if pgrep -f "$HERE/plugin/bin/Release/bin/deck-apps watch" >/dev/null; then LOADED=1; break; fi
+for _ in $(seq 1 30); do
+  NOW="$(pgrep -f "$HELPER" | sort | tr '\n' ' ')"
+  if [ -n "$NOW" ] && [ "$NOW" != "$BEFORE" ]; then LOADED=1; break; fi
   sleep 1
 done
 
@@ -137,7 +141,7 @@ $(bold "Installed. Three things only you can do:")
 
   1. Put the keys on your keypad
      Logi Options+  ->  MX Creative Keypad  ->  find "MX Keypad Warp Claude Code" in the action list
-     Drag onto keys:  Claude Sessions, App Switcher, Needs me, Working, Allow
+     Drag onto keys:  Claude Sessions, App Switcher, Needs me, Working, Allow, Model
 
   2. Allow typing (only needed for esc, /compact, yes / always / no ...)
      System Settings -> Privacy & Security -> Accessibility -> enable "Logi Plugin Service"
