@@ -1,4 +1,4 @@
-# Claude Deck
+# mx-keypad-warp-claude-code
 
 Every running [Claude Code](https://claude.com/claude-code) session as a live tile on a **Logitech MX
 Creative Keypad** — jump to it, answer its permission prompts, interrupt it — and a buzz on an
@@ -59,7 +59,7 @@ quits, activates or hides - nothing polls - and exits by itself when the plugin 
 | **while that session is on a permission prompt** | the last keys of its page become **yes / always / no** |
 | **while it is asking a multiple-choice question** | the tile shows the question and the keys become the **actual option labels** ("2 Supabase Auth"). Uses the command row plus any blank tiles, and only appears if every option fits |
 
-**On your home page** (drag from Options+ → *Claude Deck*)
+**On your home page** (drag from Options+ → *MX Keypad Warp Claude Code*)
 
 | Key | Shows | Press |
 |---|---|---|
@@ -92,8 +92,9 @@ dotnet build plugin/src/ClaudeDeckPlugin.csproj -c Release   # builds, links int
 hooks/install-hooks.sh              # wires 11 events into ~/.claude/settings.json (backup kept)
 ```
 
-Then in **Logi Options+** → your keypad → *Claude Deck*: drag **Claude Sessions**, **Needs me**,
-**Working** and **Allow** onto keys. For haptics: MX Master 4 → *Haptic feedback* → enable Claude Deck.
+Then in **Logi Options+** → your keypad → *MX Keypad Warp Claude Code*: drag **Claude Sessions**, **Needs me**,
+**Working** and **Allow** onto keys. For haptics: MX Master 4 → *Haptic feedback* → enable
+MX Keypad Warp Claude Code.
 
 The typing keys need **System Settings → Privacy & Security → Accessibility → Logi Plugin Service**.
 Status, colours and focusing work without it.
@@ -141,5 +142,8 @@ tail -f ~/Library/Application\ Support/Logi/LogiPluginService/Logs/plugin_logs/C
 - `warp.sqlite` is Warp's internal schema; if it changes, Warp sessions collapse onto one page —
   status and focus keep working.
 - Sessions that were already running before the hooks were installed appear on their next event.
+
+The plugin's internal id is `ClaudeDeck` (log file name, reload URL, `~/.claude/deck/`). It is kept
+stable on purpose: Options+ binds the keys you have placed to that id.
 
 MIT.

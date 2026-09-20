@@ -1,6 +1,7 @@
 type: plugin4
+# Internal id. Options+ binds placed keys to it, so it stays put even though the display name changed.
 name: ClaudeDeck
-displayName: Claude Deck
+displayName: MX Keypad Warp Claude Code
 description: |
   Live status tiles for every Claude Code session on the MX Creative Keypad: jump to a session,
   answer its permission prompts, interrupt it, and feel it finish on an MX Master 4.
@@ -23,3 +24,5 @@ pluginCapabilities:
 minimumLoupedeckVersion: 6.4
 
 license: MIT
+homePageUrl: https://github.com/hshekhar-git/mx-keypad-warp-claude-code
+supportPageUrl: https://github.com/hshekhar-git/mx-keypad-warp-claude-code/issues

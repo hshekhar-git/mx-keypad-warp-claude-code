@@ -1,4 +1,4 @@
-displayName: Claude Deck
+displayName: MX Keypad Warp Claude Code
 description: What your Claude Code sessions are doing
 events:
     - name: needsAttention
