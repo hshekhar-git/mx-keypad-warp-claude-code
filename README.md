@@ -30,7 +30,7 @@ that session's own page:**
 │  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
 │ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch)
 │ feat/hero │ 1M context│           │   effort      auto · low · medium · high · xhigh · max
-├───────────┼───────────┼───────────┤   mode        ask · auto-edit · plan  (Shift-Tab)
+├───────────┼───────────┼───────────┤   mode        ask · auto-edit · plan · [bypass] · [auto]
 │   mode    │    esc    │ /compact  │   then your command keys; more on the next page ▶
 │ auto-edit │           │           │
 └───────────┴───────────┴───────────┘
@@ -44,7 +44,10 @@ for a permission prompt, the **actual option labels** for a multiple-choice ques
   in use sends nothing.
 - **Effort** is read from the session's own `/effort` history (the whole transcript is searched once,
   since one early `/effort` can be megabytes back), else `effortLevel` in your settings, else `auto`.
-- **Permission mode** comes from Claude Code's hooks, which only report it when something happens. So
+- **Permission mode** is changed with Shift-Tab, so a change is sent as that many steps round Claude
+  Code's own cycle. `bypass` and `auto` are only stops on that cycle if they are enabled for you, and
+  nothing says whether they are - so each joins the key's choices once a session has been seen on it.
+- The mode itself comes from Claude Code's hooks, which only report it when something happens. So
   right after a change the key shows what it just set, and the next event confirms or corrects it.
   Mode changes work mid-turn; model and effort are refused while the session is busy.
 - Reopening the folder starts at the list - unless exactly one session is blocked on you, in which
@@ -127,7 +130,7 @@ without opening it.
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
 | **Model** | the target session's model, and whether it is on the 1M window | steps to the next model; commits when you stop tapping |
 | **Effort** | its effort level | steps `auto → low → medium → high → xhigh → max` |
-| **Permission mode** | `ask`, `auto-edit` or `plan` | steps it (Shift-Tab) |
+| **Permission mode** | `ask`, `auto-edit`, `plan`, and `bypass` / `auto` where enabled | steps it (Shift-Tab) |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |
 

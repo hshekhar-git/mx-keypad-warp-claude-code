@@ -97,57 +97,83 @@ namespace Loupedeck.ClaudeDeckPlugin
     // Permission mode has no "set" - only Shift-Tab, which steps it - so moving from one option to
     // another is sent as that many steps round the cycle.
     //
+    // The cycle is Claude Code's own: default -> acceptEdits -> plan -> bypassPermissions -> auto ->
+    // default, where the last two stops exist only if they are enabled for you. There is no way to
+    // ask whether they are, so a stop is included once any session has been seen sitting on it.
+    //
     // A hook only reports the mode when something happens, so right after a change the file still
     // says the old one. What was just set is remembered and shown until the session's next event
-    // confirms or corrects it (a session started with bypass enabled has a fourth stop in its cycle,
-    // which is the one case this prediction gets wrong for a moment).
+    // confirms or corrects it.
     public sealed class ModeSetting : SessionSetting
     {
-        private static readonly String[] Ids = { "default", "acceptEdits", "plan" };
-
-        private static readonly SettingOption[] Modes =
+        private static readonly (String Id, String Label, String Color, Boolean Optional)[] Cycle =
         {
-            new() { Label = "ask", Color = "" },
-            new() { Label = "auto-edit", Color = "amber" },
-            new() { Label = "plan", Color = "blue" },
+            ("default", "ask", "", false),
+            ("acceptEdits", "auto-edit", "amber", false),
+            ("plan", "plan", "blue", false),
+            ("bypassPermissions", "bypass", "red", true),
+            ("auto", "auto", "violet", true),
         };
 
+        private static readonly ConcurrentDictionary<String, Boolean> Seen = new();
         private static readonly ConcurrentDictionary<String, (String Mode, Int64 Ts)> Predicted = new();
 
         public override String Title => "mode";
 
-        public override IReadOnlyList<SettingOption> Options => Modes;
+        private static List<(String Id, String Label, String Color, Boolean Optional)> Available()
+        {
+            foreach (var s in SessionStore.Instance.All)
+            {
+                if (s.Mode.Length > 0)
+                {
+                    Seen[s.Mode] = true;
+                }
+            }
+
+            return Cycle.Where(m => !m.Optional || Seen.ContainsKey(m.Id)).ToList();
+        }
+
+        public override IReadOnlyList<SettingOption> Options =>
+            Available().Select(m => new SettingOption { Label = m.Label, Color = m.Color }).ToList();
 
         private static String Effective(SessionInfo s) =>
             Predicted.TryGetValue(s.Key, out var p) && p.Ts == s.Ts ? p.Mode : s.Mode;
 
-        public override Int32 CurrentIndex(SessionInfo s) => Array.IndexOf(Ids, Effective(s));
+        public override Int32 CurrentIndex(SessionInfo s) => Available().FindIndex(m => m.Id == Effective(s));
 
-        public override String CurrentText(SessionInfo s) => Effective(s) switch
+        public override String CurrentText(SessionInfo s)
         {
-            "default" => "ask",
-            "acceptEdits" => "auto-edit",
-            "plan" => "plan",
-            "bypassPermissions" => "bypass",
-            "" => "?",
-            var other => other,
-        };
+            var mode = Effective(s);
+            var known = Cycle.FirstOrDefault(m => m.Id == mode);
+            return known.Id != null ? known.Label : mode.Length > 0 ? mode : "?";
+        }
 
         // Shift-Tab works mid-turn; it is only a dialog that gets in the way.
         public override String Blocked(SessionInfo s) => s?.State == "attention" ? "answer it first" : null;
 
         public override Boolean Apply(SessionInfo s, Int32 from, Int32 to)
         {
-            // From an unknown or off-cycle mode, one step at a time is all that can be promised.
-            var steps = from < 0 ? 1 : ((to - from) + Ids.Length) % Ids.Length;
+            var modes = Available();
+            if (to < 0 || to >= modes.Count)
+            {
+                return false;
+            }
+
+            // From a mode that is not on the cycle (dontAsk, say) Claude Code goes to default, which
+            // is one step; the rest of the way is counted from there.
+            //
+            // A mode that is simply not known yet (no hook event has carried one) is different:
+            // there is nothing to count from, so it gets a single step and no claim about the result.
+            var unknown = Effective(s).Length == 0;
+            var steps = unknown ? 1 : from >= 0 ? ((to - from) + modes.Count) % modes.Count : 1 + to;
             if (steps == 0 || !Deck.CycleMode(s, steps))
             {
                 return false;
             }
 
-            if (from >= 0)
+            if (!unknown)
             {
-                Predicted[s.Key] = (Ids[to], s.Ts);
+                Predicted[s.Key] = (modes[to].Id, s.Ts);
             }
 
             return true;
