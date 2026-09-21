@@ -63,7 +63,15 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public override String Hint(SessionInfo s) => s.Selected.OneM ? "model · 1M" : "model";
 
-        public override String Detail(SessionInfo s) => s.Selected.OneM ? "1M context" : "tap to change";
+        // How much of this model's own weekly window is gone, when the plan keeps one for it.
+        public override String Detail(SessionInfo s)
+        {
+            UsageProbe.Wanted();
+            var week = UsageStore.ModelWindow(s);
+            return week != null ? (s.Selected.OneM ? $"1M · week {week.Percent:0}%" : $"week {week.Percent:0}%")
+                : s.Selected.OneM ? "1M context"
+                : "tap to change";
+        }
 
         public override Boolean Apply(SessionInfo s, Int32 from, Int32 to) =>
             to >= 0 && to < DeckConfig.Models.Count && Deck.SwitchModel(s, DeckConfig.Models[to]);

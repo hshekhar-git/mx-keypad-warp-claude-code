@@ -30,8 +30,8 @@
   //   usageRow     keep the list's bottom three keys for plan usage (session, weekly, and a model's
   //                weekly window or pace), leaving five session tiles a page; false gives all eight
   //                to sessions
-  //   pageUsageRow the same row under a session's own page, its third key being THAT session's model;
-  //                false puts info, the settings and your keys back on one page of eight
+  //   pageUsageRow the same row on a session's own page, after its keys (so on the next page), its
+  //                third key being THAT session's model; false leaves it off
   "sessions": { "group": "flat", "focusOnOpen": true, "usageRow": true, "pageUsageRow": true },
 
   // Plan usage.

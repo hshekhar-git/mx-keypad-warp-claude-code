@@ -13,11 +13,11 @@ namespace Loupedeck.ClaudeDeckPlugin
     //        Press a session to open it; hold one to interrupt it without going in.
     //
     // PAGE   one session: a way back (which also reports on everyone else - see below), its live tile
-    //        (press = jump to its pane), its settings (model, effort, permission mode - tap to step),
-    //        its facts (context, branch, turns, age), then your command keys. While it is blocked on a
-    //        prompt the keypad can answer, the answers come first, straight after the tile. Like the
-    //        list, a page keeps its bottom row for plan usage - here the third key is the weekly
-    //        window of THIS session's model - so it runs to a second page sooner.
+    //        (press = jump to its pane), its facts (context, branch, turns, age), its settings (model,
+    //        effort, permission mode - tap to step), then your command keys. While it is blocked on a
+    //        prompt the keypad can answer, the answers come first, straight after the tile. The
+    //        model key carries the weekly window of THIS session's model; the full usage row - its
+    //        third key that same window - follows the command keys, on the next page.
     //
     // The host keeps the top-left key for its own Back, which leaves the folder entirely; hence the
     // page's own "sessions" key for going up one level. Eight names per page keeps both layers
@@ -180,32 +180,21 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 list.Add("p:lowpri");
             }
-            // A question with more answers than fit above the usage row gets the whole page instead:
-            // answers split across two pages are worse than a minute without the numbers.
-            if (!DeckConfig.PageUsageRow || answers.Count > KeysPerPage - 5)
-            {
-                list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
-                list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
-                return list;
-            }
-
-            // With the usage row a page is five keys over three, so what you change comes before
-            // what you only read: the settings share the first page with the tile, and the facts and
-            // your own keys follow. Answers, when there are any, take the settings' place.
-            list.AddRange(new[] { "p:model", "p:effort", "p:mode", "p:info" });
+            list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
             list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
 
-            var perPage = KeysPerPage - 3;
-            var paged = new List<String>();
-            for (var i = 0; i < list.Count; i += perPage)
+            // Plan usage goes after everything else, never instead of it: padded so that it is the
+            // bottom row of whichever page it lands on - page two, with the default keys.
+            if (DeckConfig.PageUsageRow)
             {
-                var keys = list.Skip(i).Take(perPage).ToList();
-                paged.AddRange(keys);
-                paged.AddRange(Enumerable.Range(keys.Count, perPage - keys.Count).Select(n => $"x:page:{i}:{n}"));
-                paged.AddRange(Enumerable.Range(0, 3).Select(n => $"p:u:{n}:{i}"));
+                var row = KeysPerPage - 3;
+                var used = list.Count % KeysPerPage;
+                var pad = used <= row ? row - used : KeysPerPage - used + row;
+                list.AddRange(Enumerable.Range(0, pad).Select(n => $"x:page:{n}"));
+                list.AddRange(Enumerable.Range(0, 3).Select(n => $"p:u:{n}"));
             }
 
-            return paged;
+            return list;
         }
 
         public override IEnumerable<String> GetButtonPressActionNames(DeviceType deviceType) =>

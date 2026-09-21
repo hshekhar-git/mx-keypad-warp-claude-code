@@ -83,7 +83,6 @@ Threading.Thread.Sleep 300
 UsageStore.Start()
 Threading.Thread.Sleep 400
 let usage i = TileRenderer.UsageKey(i, size)
-let usageFor (s: SessionInfo) = [ for i in 0 .. 2 -> TileRenderer.UsageKey(i, size, s) ]
 
 // ---- the scenes -------------------------------------------------------------------------------
 // 1  a bare profile, as Options+ shows it before anything is placed
@@ -120,22 +119,29 @@ save "list" [ back (); tile web true 0; tile api false 0; tile docs false 0; til
 let model  = new SettingStepper(ModelSetting())
 let effort = new SettingStepper(EffortSetting())
 let mode   = new SettingStepper(ModeSetting())
-save "page" ([
+save "page" [
     back ()
     TileRenderer.Back(ResizeArray [ api; docs; infra; mobile ], false, size, 0)
     tile web true 2
+    TileRenderer.Info(web, size)
     model.Render(web, false, size)
     effort.Render(web, false, size)
-    mode.Render(web, false, size) ] @ usageFor web)
+    mode.Render(web, false, size)
+    TileRenderer.Command("esc", null, false, size)
+    TileRenderer.Command("/compact", null, false, size) ]
+
 
 // 6  a blocked session's page: the answers come first
-save "answer" ([
+save "answer" [
     back ()
     TileRenderer.Back(ResizeArray [ web; docs; infra; mobile ], false, size, 0)
     tile api true 0
     TileRenderer.Command("yes", "green", false, size)
     TileRenderer.Command("always", "amber", false, size)
-    TileRenderer.Command("no", "red", false, size) ] @ usageFor api)
+    TileRenderer.Command("no", "red", false, size)
+    TileRenderer.Info(api, size)
+    model.Render(api, false, size)
+    effort.Render(api, false, size) ]
 
 // 7  a multiple-choice question
 let asking = session "api" "Rate limiter for /search" "attention" "question" "AskUserQuestion" "" 0.18 25L
@@ -147,22 +153,28 @@ question.Title <- asking.Title
 question.Selected <- asking.Selected
 question.ContextTokens <- 180000L
 question.ContextWindow <- 1000000
-save "question" ([
+save "question" [
     back ()
     TileRenderer.Back(ResizeArray [ web; docs; infra; mobile ], false, size, 0)
     tile question true 0
     TileRenderer.Command("1 Redis", "coral", false, size)
     TileRenderer.Command("2 Postgres", "coral", false, size)
-    TileRenderer.Command("3 In memory", "coral", false, size) ] @ usageFor question)
+    TileRenderer.Command("3 In memory", "coral", false, size)
+    TileRenderer.Info(question, size)
+    model.Render(question, false, size)
+    effort.Render(question, false, size) ]
 
 // 8  tap-to-step, mid-gesture
-save "step" ([
+save "step" [
     back ()
     TileRenderer.Back(ResizeArray [ api; docs; infra; mobile ], false, size, 0)
     tile docs true 0
+    TileRenderer.Info(docs, size)
     model.Render(docs, false, size)
     TileRenderer.Model("effort", "xhigh", TileRenderer.Ascii.Countdown 0.6, "coral", true, false, size)
-    mode.Render(docs, false, size) ] @ usageFor docs)
+    mode.Render(docs, false, size)
+    TileRenderer.Command("esc", null, false, size)
+    TileRenderer.Command("/compact", null, false, size) ]
 
 // 9  the app switcher - icons come from the cache the plugin keeps; any that are missing fall back
 //    to a lettered square, so this runs on a machine that has never run the plugin

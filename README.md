@@ -27,7 +27,7 @@ Every tile below was drawn by the plugin's own renderer (`tools/make-steps.sh` r
 |---|---|
 | <img src="docs/steps/01-install.png" alt="Step 1: install with one command."> | <img src="docs/steps/02-place.png" alt="Step 2: drag the keys onto the keypad in Logi Options+."> |
 | <img src="docs/steps/03-main.png" alt="Step 3: the main page with one session blocked."> | <img src="docs/steps/04-calm.png" alt="The main page when nothing needs you."> |
-| <img src="docs/steps/05-list.png" alt="Step 4: the sessions list, five sessions above the usage row."> | <img src="docs/steps/06-page.png" alt="Step 5: one session's page: model, effort and mode over a usage row for its model."> |
+| <img src="docs/steps/05-list.png" alt="Step 4: the sessions list, five sessions above the usage row."> | <img src="docs/steps/06-page.png" alt="Step 5: one session's page with info, model, effort and mode; the model key shows that model's weekly usage."> |
 | <img src="docs/steps/07-answer.png" alt="Step 6: a blocked session's page with yes, always and no keys."> | <img src="docs/steps/08-question.png" alt="A multiple-choice question with the real options on the keys."> |
 | <img src="docs/steps/09-step.png" alt="Step 7: tap to step, with a countdown bar."> | <img src="docs/steps/10-apps.png" alt="Step 8: the app switcher with icons and a session badge."> |
 
@@ -79,7 +79,8 @@ The list inside **Claude Sessions** keeps its bottom row for your plan:
 
 **The third key** is a per-model weekly window - `Current week (Fable)` on the usage page - when your
 plan keeps one. In the list it is whichever is fullest; **on a session's page it is the one that counts
-that session's model.** When there is no such window (or none for that model), it shows pace.
+that session's model** - there the row comes after the page's own keys, on the next page, and the
+model key carries the same figure (`week 57%`) so it is in sight without paging. When there is no such window (or none for that model), it shows pace.
 
 **Pace** answers "do I make it to the reset?". From how much of the five-hour window has gone and how
 much you have used, it projects where you land: `~85% by the reset` in green if you make it, or
@@ -110,7 +111,7 @@ does when you type `/usage`.
 - The probe runs from `~/.claude/deck`, which leaves one empty folder for that path under
   `~/.claude/projects`. The hook ignores it, so it never appears as a session.
 - The same three keys exist for the main page under **Usage**. `"usageRow": false` gives the list all
-  eight keys back; `"pageUsageRow": false` does the same for a session's page.
+  eight keys back; `"pageUsageRow": false` leaves the row off a session's page.
 
 ## Two layers
 
@@ -122,23 +123,21 @@ one and you are on that session's own page:**
 │  ‹ Back   │ ‹ sessions│  the tile │   ‹ sessions  up one level - and the other sessions' way of
 │ (Options+)│  ● ● ●    │ Edit 2:31 │                 tapping you on the shoulder (see below)
 ├───────────┼───────────┼───────────┤   the tile    live; press = jump to its pane, hold = interrupt
-│   model   │  effort   │   mode    │   model       tap to step (see Model switch)
-│ Fable 5.1 │   high    │ auto-edit │   effort      auto · low · medium · high · xhigh · max
-│ 1M context│           │           │   mode        ask · auto-edit · plan · [bypass] · [auto]
-├───────────┼───────────┼───────────┤
-│  session  │  weekly   │fable week │   plan usage, as under the list - but the third key is the
-│    88%    │    65%    │    57%    │   weekly window of THIS session's model
+│  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
+│ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch); underneath, how
+│ feat/hero │1M·week 57%│           │               much of THAT model's weekly window is gone
+├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max
+│   mode    │    esc    │ /compact  │   mode        ask · auto-edit · plan · [bypass] · [auto]
+│ auto-edit │           │           │   then your command keys; more on the next page ▶
 └───────────┴───────────┴───────────┘
-  page two ▶  info (context % and tokens, branch, turns, age) · esc · /compact · your other keys,
-              over the same usage row
+  next page ▶  any further command keys, then the usage row along the bottom:
+               session · weekly · this session's model (fable week 57%)
 ```
 
-`"pageUsageRow": false` drops the usage row from the page and puts info, the settings and your keys
-back on one page of eight.
+`"pageUsageRow": false` leaves the usage row off the session's page.
 
 While the session is **blocked**, the answers come first, straight after the tile: **yes / always / no**
-for a permission prompt, the **actual option labels** for a multiple-choice question. (A question with
-four or more options takes the usage row's keys too, rather than splitting its answers over two pages.)
+for a permission prompt, the **actual option labels** for a multiple-choice question.
 
 **While you are inside one session, the `‹ sessions` key watches the rest.** It blinks **red** with
 the name - `web-app needs you` - when another session is blocked on you (`2 need you` for several),
