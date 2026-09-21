@@ -59,7 +59,8 @@
   // The command keys on every session's page, after its info and settings. Max 7; the first two fit
   // on the page's first screen, the rest are one press of the right arrow away.
   //   text    typed exactly as written (a trailing space is kept)
-  //   submit  press Return afterwards
+  //   submit  press Return afterwards. Off is for something you finish by hand: "/compact " with a
+  //           trailing space and no submit lets you add your own instructions before sending
   //   key     "escape" interrupts instead of typing
   //   color   "green" | "amber" | "red" | "coral" | "purple" | "blue" | "violet", default neutral
   //   id      optional name of your choosing. A key you have placed from "Commands" in Options+ is
@@ -68,7 +69,7 @@
   // The same keys are published under "Commands" in Options+ for your home page.
   "keys": [
     { "label": "esc",      "key": "escape" },
-    { "label": "/compact", "text": "/compact ", "submit": false },
+    { "label": "/compact", "text": "/compact",  "submit": true  },
     { "label": "continue", "text": "continue", "submit": true },
     { "label": "/clear",   "text": "/clear",   "submit": false, "color": "red" }
   ]

@@ -21,6 +21,12 @@ namespace Loupedeck.ClaudeDeckPlugin
         // the session never ran one, in which case it is on the default.
         public String Effort { get; init; } = "";
 
+        // The permission mode, from the newest line that states it. Claude Code writes a
+        // {"type":"permission-mode"} line the moment the mode changes and stamps the mode on every
+        // message, so this is known for a resumed session before its first prompt, and it moves as
+        // soon as Shift-Tab is pressed - neither of which is true of what the hooks report.
+        public String Mode { get; init; } = "";
+
         // Set while the newest main-thread reply is a usage-limit error: what it said about when the
         // limit lifts ("4:40am"), and that moment, after which it stops counting.
         public String LimitLabel { get; init; } = "";
@@ -135,6 +141,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var switchedTo = "";
             var modelSettled = false;
             var effort = "";
+            var mode = "";
             var replySeen = false;
             var limitLabel = "";
             var limitResetsAt = DateTime.MinValue;
@@ -160,7 +167,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                     && (line.Contains("Set model to", StringComparison.Ordinal) || line.Contains("Kept model as", StringComparison.Ordinal));
                 var wantsEffort = effort.Length == 0 && IsEffortCandidate(line);
                 var wantsReply = !replySeen && line.Contains("\"type\":\"assistant\"", StringComparison.Ordinal);
-                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch && !wantsEffort && !wantsReply)
+                var wantsMode = mode.Length == 0 && line.Contains("\"permissionMode\"", StringComparison.Ordinal);
+                if (!wantsUsage && !wantsTitle && !wantsSlug && !wantsSwitch && !wantsEffort && !wantsReply && !wantsMode)
                 {
                     continue;
                 }
@@ -192,6 +200,11 @@ namespace Loupedeck.ClaudeDeckPlugin
                     if (wantsEffort)
                     {
                         effort = EffortFrom(root);
+                    }
+
+                    if (wantsMode)
+                    {
+                        mode = Str(root, "permissionMode");
                     }
 
                     // Only the NEWEST main-thread reply says whether the session is rate-limited now:
@@ -253,7 +266,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 {
                 }
 
-                if (tokens >= 0 && effort.Length > 0 && slug.Length > 0 && (customTitle.Length > 0 || aiTitle.Length > 0))
+                if (tokens >= 0 && effort.Length > 0 && mode.Length > 0 && slug.Length > 0 && (customTitle.Length > 0 || aiTitle.Length > 0))
                 {
                     break;
                 }
@@ -271,6 +284,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             return new TranscriptInfo
             {
                 Effort = effort.Length > 0 ? effort : previous?.Effort ?? "",
+                Mode = mode.Length > 0 ? mode : previous?.Mode ?? "",
                 LimitLabel = replySeen ? limitLabel : previous?.LimitLabel ?? "",
                 LimitResetsAt = replySeen ? limitResetsAt : previous?.LimitResetsAt ?? DateTime.MinValue,
                 // A tail that happens to hold no title line must not blank a tile that had one.

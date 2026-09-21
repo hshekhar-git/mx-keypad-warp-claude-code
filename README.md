@@ -139,9 +139,14 @@ limited; any later reply, or the reset time passing, means not.
 - **Permission mode** is changed with Shift-Tab, so a change is sent as that many steps round Claude
   Code's own cycle. `bypass` and `auto` are only stops on that cycle if they are enabled for you, and
   nothing says whether they are - so each joins the key's choices once a session has been seen on it.
-- The mode itself comes from Claude Code's hooks, which only report it when something happens. So
-  right after a change the key shows what it just set, and the next event confirms or corrects it.
-  Mode changes work mid-turn; model and effort are refused while the session is busy.
+- The mode itself is read from the session's **transcript**, where Claude Code notes a change the
+  moment it happens - so it is known for a resumed session before its first prompt, and it follows a
+  Shift-Tab you press by hand. A brand-new session that has said nothing yet shows what your other
+  sessions are on, with a question mark (`auto?`), because that is a guess. Mode changes work
+  mid-turn; model and effort are refused while the session is busy.
+- **Once you answer a prompt from the keypad, its answer keys go away** and the tile turns to
+  working. Claude Code reports a prompt appearing but never its being answered, so without this the
+  keys would stay live until the approved command finished - with **no** sending an Escape into it.
 - Reopening the folder starts at the list - unless exactly one session is blocked on you, in which
   case it opens straight onto that one.
 - **Model**, **Effort** and **Permission mode** also exist as home-page keys, acting on the target
@@ -511,8 +516,8 @@ docs/steps/                   steps.html - the walkthrough as a page - and the P
 - A session that was already running when the hooks were installed appears on its next event.
 - Plan usage covers the five-hour and weekly (all models) windows - the two the status line carries.
   The numbers are as fresh as the most recently active session's last API response.
-- Permission mode is only reported when something happens in the session, so just after a change the
-  key shows what it set and the next event confirms it.
+- A prompt you answer **in the terminal** (rather than from the keypad) leaves its tile red until the
+  approved command finishes: Claude Code has no event for "the prompt was answered".
 - Keys that type (answers, command keys, model / effort / mode) need Accessibility, and refuse to
   type unless the expected terminal is in front; model and effort are also refused mid-turn.
 

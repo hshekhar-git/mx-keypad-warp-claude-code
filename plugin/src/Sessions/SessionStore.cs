@@ -34,7 +34,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         public String Detail { get; init; } = "";
 
         // Permission mode as of the last hook event, and when that event was.
-        public String Mode { get; init; } = "";
+        public String Mode { get; set; } = "";
         public Int64 Ts { get; init; }
         public Int32 Turns { get; init; }
 
@@ -260,9 +260,20 @@ namespace Loupedeck.ClaudeDeckPlugin
                     }
 
                     ts = Num(r, "ts");
+                    var key = Path.GetFileNameWithoutExtension(file);
+                    var state = Str(r, "state") is { Length: > 0 } st ? st : "idle";
+                    var kind = Str(r, "kind");
+
+                    // A prompt answered from the keypad: working, whatever the file still says.
+                    if (state == "attention" && Deck.WasAnswered(key, ts))
+                    {
+                        state = "busy";
+                        kind = "";
+                    }
+
                     s = new SessionInfo
                     {
-                        Key = Path.GetFileNameWithoutExtension(file),
+                        Key = key,
                         Term = Str(r, "term"),
                         WarpUuid = Str(r, "warp_uuid"),
                         Bundle = Str(r, "bundle"),
@@ -273,8 +284,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                         Transcript = Str(r, "transcript"),
                         Prompt = Str(r, "prompt"),
                         Started = Num(r, "started"),
-                        State = Str(r, "state") is { Length: > 0 } st ? st : "idle",
-                        Kind = Str(r, "kind"),
+                        State = state,
+                        Kind = kind,
                         Since = Num(r, "since"),
                         TurnSince = Num(r, "turn_since"),
                         Tool = Str(r, "tool"),
@@ -387,6 +398,13 @@ namespace Loupedeck.ClaudeDeckPlugin
                 s.Selected = ModelNames.Resolve(info.SwitchedTo, info.Model);
                 s.Effort = info.Effort.Length > 0 ? info.Effort : ModelNames.DefaultEffort;
                 s.Limit = info.Limit;
+
+                // The transcript is told about a mode change when it happens; a hook only mentions the
+                // mode in passing, on the next event. So the transcript wins whenever it has a view.
+                if (info.Mode.Length > 0)
+                {
+                    s.Mode = info.Mode;
+                }
 
                 // More than 200k tokens in the window settles the question whatever the names say.
                 if (!s.Selected.OneM && s.Selected.IsKnown && info.ContextTokens > 200_000)

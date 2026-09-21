@@ -32,7 +32,12 @@ on run {allowedApps, whatToDo, theText}
             key code 48 using shift down
         else
             if (count of theText) > 0 then keystroke theText
-            if whatToDo is ""submit"" then key code 36 -- Return
+            if whatToDo is ""submit"" then
+                -- Claude Code opens a menu as a slash command is typed; give it a moment to settle,
+                -- or the Return can land before the command it is meant to run.
+                if (count of theText) > 0 then delay 0.2
+                key code 36 -- Return
+            end if
         end if
     end tell
     return ""sent""

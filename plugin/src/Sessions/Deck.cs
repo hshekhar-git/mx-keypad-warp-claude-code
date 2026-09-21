@@ -25,6 +25,17 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static volatile String _target;
 
+        // Sessions whose prompt was just answered from the keypad, with the timestamp of the hook
+        // event that was current at the time. Claude Code reports a prompt appearing but never its
+        // being answered, so the session file goes on saying "blocked" until the approved tool has
+        // finished - and for all that time the answer keys would still be live, with "no" sending an
+        // Escape that interrupts the very command just approved. Until the session's next event says
+        // otherwise, an answered session is therefore taken to be working.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<String, Int64> Answered = new();
+
+        public static Boolean WasAnswered(String sessionKey, Int64 eventTs) =>
+            Answered.TryGetValue(sessionKey, out var ts) && ts == eventTs;
+
         public static event EventHandler TargetChanged;
 
         // The session the keys act on: the pane you are actually in when a terminal is in front -
@@ -121,9 +132,16 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             Thread.Sleep(FocusSettleMs);
             PluginLog.Info($"answering \"{answer.Label}\" to {s.Kind} in {s.Project}");
-            return answer.Keys.Length > 0
+            var sent = answer.Keys.Length > 0
                 ? TermInput.TypeText(s.Bundle, answer.Keys, false)
                 : TermInput.SendEscape(s.Bundle);
+            if (sent)
+            {
+                Answered[s.Key] = s.Ts;
+                SessionStore.Instance.Poke();
+            }
+
+            return sent;
         }
 
         // Which session a model switch should go to: the target, or the only one there is.
@@ -208,6 +226,13 @@ namespace Loupedeck.ClaudeDeckPlugin
                 Thread.Sleep(120);
             }
 
+            // Claude Code notes the new mode in the transcript at once; go and read it.
+            var transcript = s.Transcript;
+            System.Threading.Tasks.Task.Delay(1200).ContinueWith(_ =>
+            {
+                TranscriptStats.Refresh(transcript);
+                SessionStore.Instance.Poke();
+            });
             return true;
         }
 

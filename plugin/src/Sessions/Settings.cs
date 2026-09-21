@@ -101,9 +101,10 @@ namespace Loupedeck.ClaudeDeckPlugin
     // default, where the last two stops exist only if they are enabled for you. There is no way to
     // ask whether they are, so a stop is included once any session has been seen sitting on it.
     //
-    // A hook only reports the mode when something happens, so right after a change the file still
-    // says the old one. What was just set is remembered and shown until the session's next event
-    // confirms or corrects it.
+    // The mode is read from the session's transcript, which records a change as it happens; what was
+    // just set from the keypad is shown for the few seconds that takes to be read back. A session
+    // that has said nothing yet - brand new, no transcript - is shown the mode your other sessions
+    // are on, with a question mark, because that is a guess.
     public sealed class ModeSetting : SessionSetting
     {
         private static readonly (String Id, String Label, String Color, Boolean Optional)[] Cycle =
@@ -116,7 +117,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         };
 
         private static readonly ConcurrentDictionary<String, Boolean> Seen = new();
-        private static readonly ConcurrentDictionary<String, (String Mode, Int64 Ts)> Predicted = new();
+        private static readonly ConcurrentDictionary<String, (String Mode, DateTime Until)> Predicted = new();
 
         public override String Title => "mode";
 
@@ -137,15 +138,27 @@ namespace Loupedeck.ClaudeDeckPlugin
             Available().Select(m => new SettingOption { Label = m.Label, Color = m.Color }).ToList();
 
         private static String Effective(SessionInfo s) =>
-            Predicted.TryGetValue(s.Key, out var p) && p.Ts == s.Ts ? p.Mode : s.Mode;
+            Predicted.TryGetValue(s.Key, out var p) && DateTime.UtcNow < p.Until ? p.Mode : s.Mode;
+
+        // What most of the other sessions are on: the best available guess for one that has not said.
+        private static String Guess() =>
+            SessionStore.Instance.All.Where(o => o.Mode.Length > 0)
+                .GroupBy(o => o.Mode).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? "";
 
         public override Int32 CurrentIndex(SessionInfo s) => Available().FindIndex(m => m.Id == Effective(s));
 
         public override String CurrentText(SessionInfo s)
         {
             var mode = Effective(s);
+            var guessed = mode.Length == 0;
+            if (guessed)
+            {
+                mode = Guess();
+            }
+
             var known = Cycle.FirstOrDefault(m => m.Id == mode);
-            return known.Id != null ? known.Label : mode.Length > 0 ? mode : "?";
+            var text = known.Id != null ? known.Label : mode;
+            return text.Length == 0 ? "?" : guessed ? text + "?" : text;
         }
 
         // Shift-Tab works mid-turn; it is only a dialog that gets in the way.
@@ -173,7 +186,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             if (!unknown)
             {
-                Predicted[s.Key] = (modes[to].Id, s.Ts);
+                Predicted[s.Key] = (modes[to].Id, DateTime.UtcNow.AddSeconds(8));
             }
 
             return true;

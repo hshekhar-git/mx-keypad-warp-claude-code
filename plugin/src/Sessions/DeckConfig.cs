@@ -231,7 +231,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 new KeyDef { Label = "esc", Key = "escape" },
                 new KeyDef { Label = "/clear", Text = "/clear", Submit = true },
-                new KeyDef { Label = "/compact", Text = "/compact ", Submit = false },
+                new KeyDef { Label = "/compact", Text = "/compact", Submit = true },
             };
 
             public static Snapshot From(JsonElement root)
