@@ -87,8 +87,9 @@ echo; bold "2/4  Building the plugin"
 mkdir -p "$SERVICE_DIR/Plugins"
 
 # Noted before the build, because the build itself asks the service to reload: what the log says
-# about this install is everything written after this point.
-LOG_BEFORE="$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')"; LOG_BEFORE="${LOG_BEFORE:-0}"
+# about this install is every line stamped from now on. (A byte offset will not do - the service
+# starts its log file afresh on a reload - but its timestamps, 2026-09-21T16-27-35-793, sort as text.)
+STARTED="$(date +%Y-%m-%dT%H-%M-%S)"
 HELPER="$HERE/plugin/bin/Release/bin/deck-apps watch"
 BEFORE="$(pgrep -f "$HELPER" | sort | tr '\n' ' ')"
 PREVIOUS="$(cat "$LINK" 2>/dev/null | tr -d '\r\n')"
@@ -135,9 +136,7 @@ fi
 #   Load() really ran here. It is not enough alone: the service runs Load() before it decides, so a
 #   refused plugin starts a helper too.
 new_log_lines() {
-  SIZE="$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')"
-  if [ "${SIZE:-0}" -lt "${LOG_BEFORE:-0}" ]; then cat "$LOG" 2>/dev/null        # the log was rotated
-  else tail -c "+$((LOG_BEFORE + 1))" "$LOG" 2>/dev/null; fi
+  awk -v from="$STARTED" '$1 >= from' "$LOG" 2>/dev/null
 }
 
 VERDICT=unknown
