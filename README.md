@@ -17,6 +17,37 @@ Then drag the keys onto your keypad in Logi Options+ and grant Accessibility - t
 [full walkthrough](#install) has every step, a way to check it works, and
 [troubleshooting](#troubleshooting).
 
+## The main page
+
+Counts tell you *how many* sessions want something. These keys tell you *which*, and get you there -
+so the page you look at while doing something else is the cockpit, not a menu.
+
+```
+┌──────────────┬──────────────┬──────────────┐
+│   OVERVIEW   │     NEXT     │    slot 1    │
+│ 1 needs you  │ web-app  │  live tile   │
+│   ■ ■ ■ ■    │ allow Bash?  │              │
+├──────────────┼──────────────┼──────────────┤
+│    slot 2    │    slot 3    │    slot 4    │
+│  live tile   │  live tile   │  live tile   │
+├──────────────┼──────────────┼──────────────┤
+│    Claude    │    Allow     │ App Switcher │
+│   Sessions   │              │              │
+└──────────────┴──────────────┴──────────────┘
+```
+
+| Key | Shows | Press |
+|---|---|---|
+| **Overview** | every session as a square in its state colour, under a headline for the most urgent thing: `1 needs you` → `2 errored` → `1 at limit` → `2 your turn` → `3 working`. The white-edged square is the session the keys act on | walks the sessions that want you, most urgent first |
+| **Next** | the *one* session that most deserves you, as a full live tile - the command it wants to run, the question it asked, `limit · 4:40am` - headed `NEXT · 1 of 3`. When nothing wants you: `all clear · 2 working` | goes to it. Dealing with it is what moves the queue on |
+| **Session slot 1-8** | your sessions *on the main page*: slot 3 is the third session, in the same stable order as the list (Warp window, tab, pane), so a session keeps its key for as long as it lives | jumps to its pane - which also makes it the target of **Model**, **Effort**, **Permission mode** and **Allow**. **Hold** to interrupt it |
+
+The queue behind *Overview* and *Next*: blocked on you (longest first), then errored, then out of
+usage, then finished (longest ago first). Working and idle sessions want nothing, so they are not in it.
+
+Slots and the folder are the same sessions at two depths: a slot is one press to the pane; **Claude
+Sessions** is where a session's own page lives (info, model, effort, mode, answers).
+
 ## Two layers
 
 **Claude Sessions** opens a list of every running session, eight to a page. **Press one and you are on
@@ -215,7 +246,9 @@ Open **Logi Options+ → MX Creative Keypad**. In the actions panel find the plu
 |---|---|---|
 | **Claude Sessions** | Claude | any home-page key - it is a folder; pressing it opens the deck |
 | **App Switcher** | Apps | any home-page key - also a folder |
-| **Needs me**, **Working**, **Allow** | Claude | home page - live status keys |
+| **Overview**, **Next**, **Allow** | Claude | home page - see [The main page](#the-main-page) |
+| **Session slot 1…8** | Session slots | home page - as many as you usually have sessions |
+| *optional:* **Needs me**, **Working** | Claude | the plain counts, if you prefer numbers |
 | *optional:* **Model**, **Effort**, **Permission mode** | Claude | home page - the same controls as on a session's page, for the target session |
 | *optional:* **Models** | Claude | a folder: pick a model from a list instead of tapping through |
 | *optional:* **Open App** | Apps | a direct "go to Warp" key: type `Warp` in its form |

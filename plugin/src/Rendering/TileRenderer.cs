@@ -36,7 +36,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public static Boolean Animates(SessionInfo s) => s.State is "busy" or "attention";
 
-        public static BitmapImage Session(SessionInfo s, Boolean selected, Boolean flash, PluginImageSize size, Int32 frame)
+        public static BitmapImage Session(SessionInfo s, Boolean selected, Boolean flash, PluginImageSize size, Int32 frame, String header = null)
         {
             // Out of usage is its own colour: it is neither an error to fix nor a turn to take.
             var bg = s.IsLimited ? Amber : StateColor(s.State);
@@ -56,7 +56,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var top = DeckConfig.ShowContext ? DrawContext(b, s, bg) : 0;
 
             // Project, what it is about, what it is doing right now.
-            b.DrawText(Middle(Or(s.Project, "—"), 15), 2, top + (Int32)(h * 0.03), w - 4, (Int32)(h * 0.17), soft, 11);
+            b.DrawText(header ?? Middle(Or(s.Project, "—"), 15), 2, top + (Int32)(h * 0.03), w - 4, (Int32)(h * 0.17), header != null ? fg : soft, 11);
             b.DrawText(What(s), 3, top + (Int32)(h * 0.20), w - 6, (Int32)(h * 0.50), fg, 13);
             b.DrawText(Status(s), 2, (Int32)(h * 0.74), w - 4, (Int32)(h * 0.18), soft, 11);
 
@@ -258,6 +258,94 @@ namespace Loupedeck.ClaudeDeckPlugin
             "violet" => Violet,
             _ => Neutral,
         };
+
+        // ---- the main page ------------------------------------------------------------------
+
+        // Every session in one key: a headline for the most urgent thing going on, and a square per
+        // session in its state colour. The square with a white edge is the one the keys act on.
+        public static BitmapImage Overview(IReadOnlyList<SessionInfo> all, String targetKey, PluginImageSize size, Int32 frame)
+        {
+            using var b = new BitmapBuilder(size);
+            var w = b.Width;
+            var h = b.Height;
+            b.Clear(Empty);
+
+            var blocked = all.Count(s => s.State == "attention");
+            var limited = all.Count(s => s.IsLimited);
+            var errored = all.Count(s => s.State == "error" && !s.IsLimited);
+            var finished = all.Count(s => s.State == "done" && !s.IsLimited);
+            var working = all.Count(s => s.State == "busy");
+
+            var (headline, color) =
+                blocked > 0 ? (blocked == 1 ? "1 needs you" : $"{blocked} need you", Tint(Attention, 0.45))
+                : errored > 0 ? ($"{errored} errored", Tint(Error, 0.5))
+                : limited > 0 ? ($"{limited} at limit", Tint(Amber, 0.5))
+                : finished > 0 ? ($"{finished} your turn", Tint(Done, 0.5))
+                : working > 0 ? ($"{working} working", Tint(Busy, 0.4))
+                : all.Count > 0 ? ("all idle", Tint(Empty, 0.55))
+                : ("no sessions", Tint(Empty, 0.4));
+            b.DrawText(headline, 2, (Int32)(h * 0.04), w - 4, (Int32)(h * 0.24), color, 14);
+
+            var shown = all.Take(9).ToList();
+            if (shown.Count == 0)
+            {
+                return b.ToImage();
+            }
+
+            // Up to 3x3, centred, sized to what there is: three sessions get three big squares.
+            var cols = shown.Count <= 3 ? shown.Count : shown.Count == 4 ? 2 : 3;
+            var rows = (shown.Count + cols - 1) / cols;
+            var areaTop = (Int32)(h * 0.32);
+            var areaH = h - areaTop - (Int32)(h * 0.08);
+            var gap = Math.Max(4, (Int32)(w * 0.05));
+            var cell = Math.Min((w - (Int32)(w * 0.16) - ((cols - 1) * gap)) / cols, (areaH - ((rows - 1) * gap)) / rows);
+            var gridW = (cols * cell) + ((cols - 1) * gap);
+            var gridH = (rows * cell) + ((rows - 1) * gap);
+            var x0 = (w - gridW) / 2;
+            var y0 = areaTop + ((areaH - gridH) / 2);
+
+            for (var i = 0; i < shown.Count; i++)
+            {
+                var s = shown[i];
+                var x = x0 + ((i % cols) * (cell + gap));
+                var y = y0 + ((i / cols) * (cell + gap));
+                var c = s.IsLimited ? Amber : StateColor(s.State);
+                if (s.State == "attention" && (frame / BlinkFrames) % 2 == 1)
+                {
+                    c = Shade(c, 0.55);
+                }
+
+                if (s.Key == targetKey)
+                {
+                    b.FillRectangle(x - 2, y - 2, cell + 4, cell + 4, BitmapColor.White);
+                }
+
+                b.FillRectangle(x, y, cell, cell, c);
+            }
+
+            return b.ToImage();
+        }
+
+        // Nothing needs you: said calmly, with what is still going on.
+        public static BitmapImage AllClear(Int32 working, Int32 total, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var h = b.Height;
+            b.Clear(Empty);
+            b.DrawText("NEXT", 2, (Int32)(h * 0.05), b.Width - 4, (Int32)(h * 0.18), Tint(Empty, 0.45), 11);
+            b.DrawText(total == 0 ? "no sessions" : "all clear", 2, (Int32)(h * 0.28), b.Width - 4, (Int32)(h * 0.34), Tint(Empty, 0.75), 16);
+            b.DrawText(working > 0 ? $"{working} working" : total > 0 ? "nothing running" : "start claude", 2, (Int32)(h * 0.72), b.Width - 4, (Int32)(h * 0.18), working > 0 ? Tint(Busy, 0.4) : Tint(Empty, 0.45), 11);
+            return b.ToImage();
+        }
+
+        public static BitmapImage EmptySlot(Int32 number, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            b.Clear(Empty);
+            b.DrawText("–", 2, (Int32)(b.Height * 0.26), b.Width - 4, (Int32)(b.Height * 0.36), Tint(Empty, 0.25), 22);
+            b.DrawText($"slot {number}", 2, (Int32)(b.Height * 0.72), b.Width - 4, (Int32)(b.Height * 0.18), Tint(Empty, 0.3), 11);
+            return b.ToImage();
+        }
 
         // ---- a session's own page -----------------------------------------------------------
 

@@ -141,7 +141,7 @@ $(bold "Installed. Three things only you can do:")
 
   1. Put the keys on your keypad
      Logi Options+  ->  MX Creative Keypad  ->  find "MX Keypad Warp Claude Code" in the action list
-     Drag onto keys:  Claude Sessions, App Switcher, Needs me, Working, Allow
+     Drag onto keys:  Overview, Next, Session slot 1-4, Claude Sessions, Allow, App Switcher
 
   2. Allow typing (only needed for esc, /compact, yes / always / no ...)
      System Settings -> Privacy & Security -> Accessibility -> enable "Logi Plugin Service"
