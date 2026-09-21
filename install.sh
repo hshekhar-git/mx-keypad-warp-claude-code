@@ -100,6 +100,11 @@ ok "linked into Logi Plugin Service"
 echo; bold "3/4  Wiring the Claude Code hooks"
 
 "$HERE/hooks/install-hooks.sh" >/dev/null && ok "11 events wired in ~/.claude/settings.json (backup: settings.json.claudedeck.bak)" || { bad "hook install failed"; exit 1; }
+if [ -s "$HOME/.claude/deck/statusline-original.cmd" ]; then
+  ok "status line tapped for plan usage - your own status line still runs and is what you see"
+else
+  ok "status line set: it feeds plan usage to the keypad and shows model · ctx · 5h · wk in Claude Code"
+fi
 ok "config at ~/.claude/deck/config.json"
 
 # ---------------------------------------------------------------------------------------------

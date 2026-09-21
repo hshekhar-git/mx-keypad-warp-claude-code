@@ -48,10 +48,45 @@ usage, then finished (longest ago first). Working and idle sessions want nothing
 Slots and the folder are the same sessions at two depths: a slot is one press to the pane; **Claude
 Sessions** is where a session's own page lives (info, model, effort, mode, answers).
 
+## Plan usage on the keypad
+
+The list inside **Claude Sessions** keeps its bottom row for your plan:
+
+```
+┌───────────┬───────────┬───────────┐
+│  ‹ Back   │ session 1 │ session 2 │   five sessions a page; a sixth starts page two,
+├───────────┼───────────┼───────────┤   and the usage row comes with it
+│ session 3 │ session 4 │ session 5 │
+├───────────┼───────────┼───────────┤   session   the five-hour window: % used, resets in 2h 13m
+│  session  │  weekly   │   pace    │   weekly    all models, this week: % used, resets Wed 9:30pm
+│    88%    │    65%    │    22m    │   pace      what the usage page does not say - see below
+└───────────┴───────────┴───────────┘
+```
+
+**Pace** answers "do I make it to the reset?". From how much of the five-hour window has gone and how
+much you have used, it projects where you land: `~85% by the reset` in green if you make it, or
+`22m until you run out` in amber/red if you do not. Blue below 75%, amber from 75%, red from 90%.
+
+**Where the numbers come from.** Claude Code passes its status line a payload that includes your plan
+usage, so the installer sets a status line command (`deck-statusline.sh`) that copies those numbers to
+`~/.claude/deck/usage.json` - and, per session, the exact model, effort and context fill, which replace
+what was otherwise inferred from transcripts. It reads **no credentials and makes no network calls**.
+
+- If you had a status line already, it is kept: yours still runs on the same input and its output is
+  what you see. With none, you get a small one: `Fable 5.1 · ctx 32% · 5h 88% · wk 65%`.
+- Each session reports the figures from *its own last API response*, so a session idle since Tuesday
+  reports Tuesday's. A report only counts if its session has been active more recently than the one
+  on file; numbers older than 20 minutes are shown greyed with their age.
+- The status line carries the five-hour and weekly (all models) windows only. The per-model weekly bar
+  on the usage page (e.g. *Fable*) is not in it; if Claude Code adds it, the third key shows it
+  instead of pace automatically.
+- The same three keys exist for the main page under **Usage**. `"usageRow": false` gives the list all
+  eight keys back.
+
 ## Two layers
 
-**Claude Sessions** opens a list of every running session, eight to a page. **Press one and you are on
-that session's own page:**
+**Claude Sessions** opens a list of every running session (five to a page above the usage row). **Press
+one and you are on that session's own page:**
 
 ```
 ┌───────────┬───────────┬───────────┐
@@ -228,8 +263,8 @@ cd mx-keypad-warp-claude-code
 1. **Checks prerequisites** — macOS, Logi Plugin Service version, .NET 10, swiftc, jq, Claude Code, Warp.
 2. **Builds** the plugin DLL and the native `deck-apps` helper, and writes a `.link` file into
    `~/Library/Application Support/Logi/LogiPluginService/Plugins/` pointing at this folder.
-3. **Wires 11 Claude Code hooks** into `~/.claude/settings.json`. Additive: your other hooks are not
-   touched, the pre-install file is kept as `settings.json.claudedeck.bak`, and re-running never
+3. **Wires 11 Claude Code hooks and the status line** into `~/.claude/settings.json`. Additive: your
+   other hooks are not touched, an existing status line is kept and still runs, the pre-install file is kept as `settings.json.claudedeck.bak`, and re-running never
    stacks duplicates. It also copies the hook to `~/.claude/deck/deck-hook.sh` and seeds
    `~/.claude/deck/config.json`.
 4. **Loads the plugin** and waits until it sees it running.
@@ -338,6 +373,9 @@ actions work on every profile.
 | All Warp sessions land on one page | Warp changed its internal database layout. Status and focus still work; only per-tab paging is lost. Please open an issue |
 | **Model** shows `?` | No reply has been written in that session yet and no `/model` switch was made, so there is nothing to read. It fills in after the first turn |
 | A model switch types `/model x` but Claude Code rejects it | That alias is not one your Claude Code version knows. Put the full model id in `alias` in `config.json` |
+| Usage keys say `no data yet` | They fill in when a session next draws its status line - send any prompt. On an API key, Bedrock or Vertex there are no plan limits to show |
+| Usage keys are grey with `35m old` | No session has talked to the API for that long; the numbers refresh on the next reply |
+| Usage differs from the usage page | The keys show what Claude Code derives from the rate-limit headers of its latest API response; the page is computed server-side and can disagree. Compare with `/usage` inside Claude Code |
 | No buzz on the MX Master 4 | Step 5, and check `"haptics"` in `~/.claude/deck/config.json`. *Claude finished* only fires for turns longer than `minTurnSeconds` (20) |
 
 ## Configuration

@@ -32,6 +32,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                 "Open Accessibility settings");
 
             DeckConfig.Start();
+            UsageStore.Start();
+            SessionStatus.Sweep();
 
             AppWatcher.HelperDir = System.IO.Path.GetDirectoryName(this.AssemblyFilePath);
             AppWatcher.Instance.EnsureStarted();
@@ -62,6 +64,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             // Statics live per load context, not per process: without this every reload would leave
             // its predecessor's timers and file watcher running.
             DeckConfig.Shutdown();
+            UsageStore.Shutdown();
             TermInput.Shutdown();
             Deck.Shutdown();
             AppWatcher.Shutdown();

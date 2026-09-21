@@ -259,6 +259,124 @@ namespace Loupedeck.ClaudeDeckPlugin
             _ => Neutral,
         };
 
+        // ---- plan usage ---------------------------------------------------------------------
+
+        private static readonly BitmapColor UsageCalm = new(0x4A, 0x8F, 0xE0);
+        private static readonly BitmapColor UsageHigh = new(0xF2, 0xA3, 0x3A);
+        private static readonly BitmapColor UsageFull = new(0xE8, 0x5D, 0x52);
+
+        private static BitmapColor UsageColor(Double percent) =>
+            percent >= 90 ? UsageFull : percent >= 75 ? UsageHigh : UsageCalm;
+
+        // One usage window: how much is gone, as a number and a bar, and when it comes back.
+        public static BitmapImage Usage(UsageWindow window, TimeSpan age, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var w = b.Width;
+            var h = b.Height;
+            b.Clear(Empty);
+            var soft = Tint(Empty, 0.5);
+            b.DrawText(window.Title, 2, (Int32)(h * 0.05), w - 4, (Int32)(h * 0.18), soft, 11);
+
+            if (!window.IsKnown)
+            {
+                b.DrawText("–", 2, (Int32)(h * 0.26), w - 4, (Int32)(h * 0.34), Tint(Empty, 0.3), 22);
+                b.DrawText("no data yet", 2, (Int32)(h * 0.74), w - 4, (Int32)(h * 0.18), Tint(Empty, 0.35), 11);
+                return b.ToImage();
+            }
+
+            // It only moves while a session is drawing its status line, so old numbers say so.
+            var stale = age > TimeSpan.FromMinutes(20);
+            var color = stale ? Tint(Empty, 0.45) : UsageColor(window.Percent);
+            b.DrawText($"{(Int32)Math.Round(window.Percent)}%", 2, (Int32)(h * 0.20), w - 4, (Int32)(h * 0.36), color, 22);
+
+            var barX = (Int32)(w * 0.12);
+            var barW = w - (2 * barX);
+            var barH = Math.Max(5, (Int32)(h * 0.06));
+            var barY = (Int32)(h * 0.60);
+            b.FillRectangle(barX, barY, barW, barH, Tint(Empty, 0.14));
+            b.FillRectangle(barX, barY, Math.Max(2, (Int32)(barW * Math.Min(1.0, window.Percent / 100.0))), barH, color);
+
+            var bottom = stale ? $"{Span(age)} old" : window.ResetsAt > DateTime.Now ? ResetText(window.ResetsAt) : "";
+            b.DrawText(bottom, 2, (Int32)(h * 0.74), w - 4, (Int32)(h * 0.18), soft, 11);
+            return b.ToImage();
+        }
+
+        // What the usage page does not tell you: whether you make it to the reset.
+        public static BitmapImage Pace(UsageWindow session, TimeSpan age, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var w = b.Width;
+            var h = b.Height;
+            b.Clear(Empty);
+            var soft = Tint(Empty, 0.5);
+            b.DrawText("pace", 2, (Int32)(h * 0.05), w - 4, (Int32)(h * 0.18), soft, 11);
+
+            String big, bottom;
+            BitmapColor color;
+            var (projected, runsOut) = UsageStore.Pace(session, TimeSpan.FromHours(5));
+            if (!session.IsKnown || age > TimeSpan.FromMinutes(20))
+            {
+                (big, bottom, color) = ("–", session.IsKnown ? "stale" : "no data yet", Tint(Empty, 0.3));
+            }
+            else if (session.Percent >= 100)
+            {
+                (big, bottom, color) = ("limit", session.ResetsAt > DateTime.Now ? ResetText(session.ResetsAt) : "", UsageFull);
+            }
+            else if (projected < 0)
+            {
+                (big, bottom, color) = ("–", "too early to say", Tint(Empty, 0.4));
+            }
+            else if (runsOut != DateTime.MinValue)
+            {
+                (big, bottom, color) = (Span(runsOut - DateTime.Now), "until you run out", runsOut - DateTime.Now < TimeSpan.FromMinutes(30) ? UsageFull : UsageHigh);
+            }
+            else
+            {
+                (big, bottom, color) = ($"~{(Int32)Math.Round(projected)}%", "by the reset", new BitmapColor(0x4C, 0xB8, 0x6E));
+            }
+
+            b.DrawText(big, 2, (Int32)(h * 0.22), w - 4, (Int32)(h * 0.40), color, big.Length > 4 ? 18 : 22);
+            b.DrawText(bottom, 2, (Int32)(h * 0.72), w - 4, (Int32)(h * 0.20), soft, 11);
+            return b.ToImage();
+        }
+
+        private static String Span(TimeSpan t)
+        {
+            if (t < TimeSpan.Zero)
+            {
+                t = TimeSpan.Zero;
+            }
+
+            return t.TotalHours >= 24 ? $"{(Int32)t.TotalDays}d {t.Hours}h"
+                : t.TotalHours >= 1 ? $"{(Int32)t.TotalHours}h {t.Minutes}m"
+                : $"{Math.Max(1, (Int32)t.TotalMinutes)}m";
+        }
+
+        // Soon: how long. Days away: which day, like the usage page says it.
+        private static String ResetText(DateTime at)
+        {
+            var left = at - DateTime.Now;
+            return left < TimeSpan.FromHours(20)
+                ? $"resets {Span(left)}"
+                : $"{at:ddd} {at:h:mm}{at.ToString("tt", System.Globalization.CultureInfo.InvariantCulture).ToLowerInvariant()}";
+        }
+
+        // The three keys of the usage row, left to right. The third is a per-model weekly bucket when
+        // Claude Code reports one, and otherwise the pace of the session window.
+        public static BitmapImage UsageKey(Int32 index, PluginImageSize size)
+        {
+            var u = UsageStore.Current;
+            return index switch
+            {
+                0 => Usage(u.Session, u.Age, size),
+                1 => Usage(u.Weekly, u.Age, size),
+                _ => u.Models.Count > 0
+                    ? Usage(new UsageWindow { Title = u.Models[0].Title.ToLowerInvariant(), Percent = u.Models[0].Percent, ResetsAt = u.Models[0].ResetsAt }, u.Age, size)
+                    : Pace(u.Session, u.Age, size),
+            };
+        }
+
         // ---- the main page ------------------------------------------------------------------
 
         // Every session in one key: a headline for the most urgent thing going on, and a square per

@@ -92,6 +92,9 @@ namespace Loupedeck.ClaudeDeckPlugin
         // "flat": every session in one list, eight to a page. "tab": one page per Warp tab.
         public static String SessionGrouping => _current.SessionGrouping;
 
+        // The list keeps its bottom row for plan usage, leaving five session tiles a page.
+        public static Boolean UsageRow => _current.UsageRow;
+
         // Opening a session's page also brings its pane to the front.
         public static Boolean FocusOnOpen => _current.FocusOnOpen;
 
@@ -203,6 +206,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             public Boolean CloseOnSwitch { get; private set; } = true;
             public String SessionGrouping { get; private set; } = "flat";
             public Boolean FocusOnOpen { get; private set; } = true;
+            public Boolean UsageRow { get; private set; } = true;
             public IReadOnlyList<ModelDef> Models { get; private set; } = new List<ModelDef>
             {
                 new() { Label = "Fable", Alias = "fable", Color = "violet" },
@@ -291,6 +295,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 if (root.TryGetProperty("sessions", out var sess) && sess.ValueKind == JsonValueKind.Object)
                 {
                     s.FocusOnOpen = Bool(sess, "focusOnOpen", true);
+                    s.UsageRow = Bool(sess, "usageRow", true);
                     if (Str(sess, "group").ToLowerInvariant() is "flat" or "tab")
                     {
                         s.SessionGrouping = Str(sess, "group").ToLowerInvariant();

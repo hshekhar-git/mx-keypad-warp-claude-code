@@ -22,7 +22,9 @@
   //   group        "flat" - every session in one list, eight to a page
   //                "tab"  - one page per Warp tab
   //   focusOnOpen  pressing a session also brings its pane to the front (false: just open its page)
-  "sessions": { "group": "flat", "focusOnOpen": true },
+  //   usageRow     keep the list's bottom three keys for plan usage (session, weekly, pace), leaving
+  //                five session tiles a page; false gives all eight to sessions
+  "sessions": { "group": "flat", "focusOnOpen": true, "usageRow": true },
 
   // The Model key and the Models folder.
   //   alias  typed after "/model " - an alias (opus) or a full id (claude-opus-5[1m])

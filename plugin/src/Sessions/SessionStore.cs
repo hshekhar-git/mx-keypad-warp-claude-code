@@ -15,6 +15,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         public String Term { get; init; } = "";
         public String WarpUuid { get; init; } = "";
         public String Bundle { get; init; } = "";
+        public String SessionId { get; init; } = "";
         public Int32 Pid { get; init; }
         public String Project { get; init; } = "";
         public String Branch { get; init; } = "";
@@ -236,6 +237,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 var sessions = this.ReadSessions();
                 this.Place(sessions);
                 this.Enrich(sessions);
+                ApplyStatus(sessions);
                 var groups = Group(sessions);
 
                 var layout = String.Join("|", groups.Select(g => g.Id + "=" + String.Join(",", g.Sessions.Select(s => s.Key))));
@@ -310,6 +312,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                         Term = Str(r, "term"),
                         WarpUuid = Str(r, "warp_uuid"),
                         Bundle = Str(r, "bundle"),
+                        SessionId = Str(r, "session_id"),
                         Pid = (Int32)Num(r, "pid"),
                         Project = Str(r, "project"),
                         Branch = Str(r, "branch"),
@@ -421,6 +424,39 @@ namespace Loupedeck.ClaudeDeckPlugin
                 s.ContextWindow = s.Selected.OneM
                     ? 1_000_000
                     : DeckConfig.ContextWindowFor(info.Model, info.ContextTokens);
+            }
+        }
+
+        // What Claude Code itself said about each session, via its status line, beats what could be
+        // worked out from the transcript: it is exact, and it is there the moment a setting changes.
+        private static void ApplyStatus(List<SessionInfo> sessions)
+        {
+            foreach (var s in sessions)
+            {
+                var status = SessionStatus.Read(s.SessionId);
+                if (status == null)
+                {
+                    continue;
+                }
+
+                var name = status.ModelName.Length > 0 ? ModelNames.FromDisplay(status.ModelName) : ModelNames.FromId(status.ModelId);
+                if (name.IsKnown)
+                {
+                    var oneM = name.OneM || status.ContextWindow >= 1_000_000
+                        || status.ModelId.Contains("[1m]", StringComparison.OrdinalIgnoreCase);
+                    s.Selected = new ModelName { Name = name.Name, OneM = oneM };
+                }
+
+                if (status.Effort.Length > 0)
+                {
+                    s.Effort = status.Effort;
+                }
+
+                if (status.ContextWindow > 0 && status.ContextTokens > 0)
+                {
+                    s.ContextWindow = status.ContextWindow;
+                    s.ContextTokens = status.ContextTokens;
+                }
             }
         }
 

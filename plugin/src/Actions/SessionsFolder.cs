@@ -7,8 +7,10 @@ namespace Loupedeck.ClaudeDeckPlugin
 
     // The deck, in two layers.
     //
-    // LIST   every session as a live tile - eight to a page (or one page per Warp tab, by config).
-    //        Press one to open it; hold one to interrupt it without going in.
+    // LIST   every session as a live tile. With the usage row on (the default) a page is five sessions
+    //        over three keys of plan usage - session, weekly, pace - repeated on every page, so a
+    //        sixth session starts page two and the numbers come with you. Off, it is eight sessions.
+    //        Press a session to open it; hold one to interrupt it without going in.
     //
     // PAGE   one session: a way back (which also reports on everyone else - see below), its live tile (press = jump to its pane), its facts (context,
     //        branch, turns, age), its settings (model, effort, permission mode - tap to step), then
@@ -88,6 +90,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             this._page = waiting.Count == 1 ? waiting[0].Key : null;
 
             Store.Changed += this.OnChanged;
+            UsageStore.Changed += this.OnRepaint;
             DeckConfig.Changed += this.OnLayoutChanged;
             Deck.TargetChanged += this.OnRepaint;
             AppWatcher.Instance.Changed += this.OnRepaint;
@@ -99,6 +102,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             this._open = false;
             Store.Changed -= this.OnChanged;
+            UsageStore.Changed -= this.OnRepaint;
             DeckConfig.Changed -= this.OnLayoutChanged;
             Deck.TargetChanged -= this.OnRepaint;
             AppWatcher.Instance.Changed -= this.OnRepaint;
@@ -112,25 +116,59 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static List<String> BuildList()
         {
-            var groups = Store.Groups;
-            if (groups.Count == 0)
-            {
-                return new List<String> { Notice };
-            }
+            var usage = DeckConfig.UsageRow;
+            var perPage = usage ? TilesPerPage - 3 : TilesPerPage;
 
-            if (DeckConfig.SessionGrouping != "tab")
+            // Each chunk is one keypad page: a run of sessions that belong together.
+            var chunks = new List<(String Id, List<SessionInfo> Sessions)>();
+            if (DeckConfig.SessionGrouping == "tab")
             {
-                return groups.SelectMany(g => g.Sessions).Select(s => $"s:{s.Key}").ToList();
-            }
-
-            // One page per tab: pad each group out to a whole number of pages.
-            var list = new List<String>();
-            foreach (var g in groups)
-            {
-                var slots = Math.Max(1, (g.Sessions.Count + TilesPerPage - 1) / TilesPerPage) * TilesPerPage;
-                for (var i = 0; i < slots; i++)
+                foreach (var g in Store.Groups)
                 {
-                    list.Add(i < g.Sessions.Count ? $"s:{g.Sessions[i].Key}" : $"x:{g.Id}:{i}");
+                    for (var i = 0; i < Math.Max(1, g.Sessions.Count); i += perPage)
+                    {
+                        chunks.Add(($"{g.Id}.{i}", g.Sessions.Skip(i).Take(perPage).ToList()));
+                    }
+                }
+            }
+            else
+            {
+                var all = Store.All;
+                for (var i = 0; i < all.Count; i += perPage)
+                {
+                    chunks.Add(($"flat.{i}", all.Skip(i).Take(perPage).ToList()));
+                }
+            }
+
+            var list = new List<String>();
+            if (chunks.Count == 0)
+            {
+                // Nothing running is no reason to hide how much of the plan is left.
+                list.Add(Notice);
+                if (usage)
+                {
+                    list.AddRange(Enumerable.Range(1, perPage - 1).Select(i => $"x:none:{i}"));
+                    list.AddRange(Enumerable.Range(0, 3).Select(i => $"u:{i}:none"));
+                }
+
+                return list;
+            }
+
+            for (var c = 0; c < chunks.Count; c++)
+            {
+                var (id, sessions) = chunks[c];
+                list.AddRange(sessions.Select(s => $"s:{s.Key}"));
+
+                // Pages before the last are padded so the usage row (or the next group) starts a new
+                // one; the last page of a plain eight-up list is left short.
+                if (usage || (DeckConfig.SessionGrouping == "tab" && c < chunks.Count - 1))
+                {
+                    list.AddRange(Enumerable.Range(sessions.Count, perPage - sessions.Count).Select(i => $"x:{id}:{i}"));
+                }
+
+                if (usage)
+                {
+                    list.AddRange(Enumerable.Range(0, 3).Select(i => $"u:{i}:{id}"));
                 }
             }
 
@@ -459,6 +497,11 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return s != null
                     ? TileRenderer.Session(s, Deck.Target?.Key == s.Key, flash, imageSize, this._frame)
                     : TileRenderer.Blank(imageSize);
+            }
+
+            if (actionParameter.StartsWith("u:", StringComparison.Ordinal))
+            {
+                return TileRenderer.UsageKey(actionParameter.Length > 2 ? actionParameter[2] - '0' : 0, imageSize);
             }
 
             if (actionParameter == Notice)
