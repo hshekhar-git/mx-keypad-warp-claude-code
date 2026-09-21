@@ -4,6 +4,8 @@ Every running [Claude Code](https://claude.com/claude-code) session as a live ti
 Creative Keypad** — jump to it, answer its permission prompts, interrupt it — and a buzz on an
 **MX Master 4** when one needs you.
 
+<p align="center"><img src="docs/steps/03-main.png" width="820" alt="An MX Creative Keypad showing an overview of five Claude sessions, the one that needs you next, four live session tiles, and an Allow key with the pending command written on it."></p>
+
 ## Quick start
 
 ```sh
@@ -17,6 +19,18 @@ Then drag the keys onto your keypad in Logi Options+ and grant Accessibility - t
 [full walkthrough](#install) has every step, a way to check it works, and
 [troubleshooting](#troubleshooting).
 
+## The tour, in pictures
+
+Every tile below was drawn by the plugin's own renderer (`tools/make-steps.sh` regenerates them).
+
+| | |
+|---|---|
+| <img src="docs/steps/01-install.png" alt="Step 1: install with one command."> | <img src="docs/steps/02-place.png" alt="Step 2: drag the keys onto the keypad in Logi Options+."> |
+| <img src="docs/steps/03-main.png" alt="Step 3: the main page with one session blocked."> | <img src="docs/steps/04-calm.png" alt="The main page when nothing needs you."> |
+| <img src="docs/steps/05-list.png" alt="Step 4: the sessions list, five sessions above the usage row."> | <img src="docs/steps/06-page.png" alt="Step 5: one session's page with info, model, effort and mode."> |
+| <img src="docs/steps/07-answer.png" alt="Step 6: a blocked session's page with yes, always and no keys."> | <img src="docs/steps/08-question.png" alt="A multiple-choice question with the real options on the keys."> |
+| <img src="docs/steps/09-step.png" alt="Step 7: tap to step, with a countdown bar."> | <img src="docs/steps/10-apps.png" alt="Step 8: the app switcher with icons and a session badge."> |
+
 ## The main page
 
 Counts tell you *how many* sessions want something. These keys tell you *which*, and get you there -
@@ -25,7 +39,7 @@ so the page you look at while doing something else is the cockpit, not a menu.
 ```
 ┌──────────────┬──────────────┬──────────────┐
 │   OVERVIEW   │     NEXT     │    slot 1    │
-│ 1 needs you  │ web-app  │  live tile   │
+│ 1 needs you  │   web-app    │  live tile   │
 │   ■ ■ ■ ■    │ allow Bash?  │              │
 ├──────────────┼──────────────┼──────────────┤
 │    slot 2    │    slot 3    │    slot 4    │
@@ -484,7 +498,9 @@ plugin/src/
   Rendering/TileRenderer.cs   every pixel
   Helpers/                    FolderWatch, Shell, PluginLog, NoApplication
   package/                    manifest, icon, haptic event definitions
-tools/                        preview.fsx (tiles -> PNG), make-icon.swift
+tools/                        preview.fsx (tiles -> PNG), make-icon.swift,
+                              steps.fsx + make-steps.sh (the pictures in this README)
+docs/steps/                   steps.html - the walkthrough as a page - and the PNGs taken of it
 ```
 
 ## Limits

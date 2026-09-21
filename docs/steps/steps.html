@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keypad walkthrough</title>
+<!--
+  The pictures in the README are screenshots of this page, one scene at a time:
+  steps.html#main shows only the scene with id="main". tools/make-steps.sh does that for every scene.
+  The tiles on the keys are PNGs drawn by the plugin's own renderer (tools/steps.fsx), so what the
+  guide shows is what the keypad shows.
+-->
+<style>
+  :root {
+    --page: #161719; --card: #1d1f22; --line: #2c2f34; --ink: #f2f3f5; --soft: #a3a8b0; --faint: #6d727a;
+    --accent: #2fd6c2; --body: #3b3d40; --body-edge: #4a4c50; --key-rim: #0b0c0d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page); color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Helvetica, Arial, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; display: grid; gap: 28px; }
+  header h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--soft); }
+
+  .scene { display: grid; grid-template-columns: 400px 1fr; gap: 44px; align-items: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 40px 48px; min-height: 520px; }
+  .scene.wide { grid-template-columns: 1fr; }
+  .step { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 10px; }
+  .scene h2 { margin: 0 0 14px; font-size: 30px; line-height: 1.15; letter-spacing: -0.02em; }
+  .scene p { margin: 0 0 14px; color: var(--soft); font-size: 17px; }
+  .scene ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 11px; }
+  .scene li { position: relative; padding-left: 22px; color: var(--ink); font-size: 16px; }
+  .scene li::before { content: ""; position: absolute; left: 2px; top: 0.62em; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .scene li b { color: #fff; }
+  .scene li span { color: var(--soft); }
+  kbd { font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; background: #0f1012; border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 7px; color: var(--ink); white-space: nowrap; }
+
+  /* ---- the keypad, after the Options+ device view ---- */
+  .keypad { width: 400px; padding: 38px 44px 30px; border-radius: 46px; position: relative;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.028) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+      linear-gradient(160deg, #46484c, #333538);
+    box-shadow: 0 0 0 2px var(--body-edge), 0 0 0 5px #26282b, 0 30px 60px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.10); }
+  .keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .key { aspect-ratio: 1; border-radius: 15px; overflow: hidden; position: relative; background: #000;
+    box-shadow: 0 0 0 3px var(--key-rim), 0 0 0 4px rgba(255,255,255,0.10), 0 5px 9px rgba(0,0,0,0.6); }
+  .key img { width: 100%; height: 100%; display: block; image-rendering: auto; }
+  .key::after { content: ""; position: absolute; inset: 0; border-radius: 15px; pointer-events: none;
+    background: linear-gradient(155deg, rgba(255,255,255,0.13), transparent 38%); }
+  .key.pick { box-shadow: 0 0 0 3px var(--accent), 0 0 22px rgba(47,214,194,0.55), 0 5px 9px rgba(0,0,0,0.6); }
+  .nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 18px; align-items: center; }
+  .nav i { height: 40px; border-radius: 13px; background: linear-gradient(#303235, #28292c); display: grid; place-items: center;
+    color: #6b6e73; font: 600 18px/1 ui-monospace, monospace; font-style: normal; box-shadow: 0 0 0 2px #1d1e20, inset 0 1px 0 rgba(255,255,255,0.07); }
+  .nav b { justify-self: center; font: 700 25px/1 "Helvetica Neue", Arial, sans-serif; letter-spacing: -0.04em; color: #55585d; }
+
+  /* ---- a terminal, for the install step ---- */
+  .term { background: #0c0d0f; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; box-shadow: 0 24px 50px rgba(0,0,0,0.45); }
+  .term header { display: flex; gap: 8px; padding: 12px 14px; background: #17181b; border-bottom: 1px solid var(--line); }
+  .term header i { width: 12px; height: 12px; border-radius: 50%; background: #3a3c40; }
+  .term pre { margin: 0; padding: 18px 22px 22px; color: #c9ced6; white-space: pre; overflow: hidden; }
+  .term .p { color: var(--accent); } .term .ok { color: #4cc38a; } .term .h { color: #fff; font-weight: 700; } .term .d { color: var(--faint); }
+  .two { display: grid; grid-template-columns: 1fr 1.05fr; gap: 40px; align-items: center; }
+
+  /* One scene at a time, for screenshots: steps.html#main */
+  body.single main { max-width: none; padding: 0; gap: 0; }
+  body.single main > header, body.single .scene:not(.show) { display: none; }
+  body.single .scene { border-radius: 0; border: 0; width: 1040px; min-height: 585px; padding: 48px 56px; }
+
+  @media (max-width: 860px) {
+    .scene, .two { grid-template-columns: 1fr; padding: 28px 20px; gap: 28px; }
+    .keypad { width: 100%; max-width: 400px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Keypad walkthrough</h1>
+    <p>Every tile on these keypads was drawn by the plugin's own renderer.</p>
+  </header>
+
+  <section class="scene wide" id="install">
+    <div class="two">
+      <div>
+        <span class="step">Step 1</span>
+        <h2>Install with one command</h2>
+        <p>It checks what you need, builds the plugin, wires the Claude Code hooks and the status line, loads it into Logi Plugin Service - and confirms it came up.</p>
+        <ul>
+          <li><b>Safe to re-run.</b> <span>Every step is idempotent.</span></li>
+          <li><b>Reversible.</b> <span><kbd>./install.sh --uninstall</kbd> puts your settings back exactly.</span></li>
+          <li><b>Look first.</b> <span><kbd>./install.sh --check</kbd> changes nothing.</span></li>
+        </ul>
+      </div>
+      <div class="term">
+        <header><i></i><i></i><i></i></header>
+<pre><span class="p">❯</span> brew install dotnet
+<span class="p">❯</span> git clone &lt;this repo&gt;
+<span class="p">❯</span> cd mx-keypad-warp-claude-code &amp;&amp; ./install.sh
+
+<span class="h">1/4  Checking prerequisites</span>
+  <span class="ok">✓</span> Logi Plugin Service 6.4.1
+  <span class="ok">✓</span> .NET SDK 10   <span class="ok">✓</span> Swift compiler   <span class="ok">✓</span> jq
+  <span class="ok">✓</span> Claude Code   <span class="ok">✓</span> Warp
+<span class="h">2/4  Building the plugin</span>
+  <span class="ok">✓</span> built ClaudeDeckPlugin.dll deck-apps
+<span class="h">3/4  Wiring the Claude Code hooks</span>
+  <span class="ok">✓</span> 11 events wired <span class="d">(backup kept)</span>
+  <span class="ok">✓</span> status line set
+<span class="h">4/4  Loading the plugin</span>
+  <span class="ok">✓</span> plugin is loaded and running</pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="scene" id="place" data-tiles="empty" data-pick="1,2,3,4,5,6,7,8,9">
+    <div>
+      <span class="step">Step 2</span>
+      <h2>Put the keys on your keypad</h2>
+      <p>In <b>Logi Options+</b> open your MX Creative Keypad, find <b>MX Keypad Warp Claude Code</b> in the actions panel, and drag onto the empty keys:</p>
+      <ul>
+        <li><b>Overview</b>, <b>Next</b>, <b>Allow</b> <span>- group <i>Claude</i></span></li>
+        <li><b>Session slot 1 … 4</b> <span>- group <i>Session slots</i></span></li>
+        <li><b>Claude Sessions</b> <span>- a folder, group <i>Claude</i></span></li>
+        <li><b>App Switcher</b> <span>- a folder, group <i>Apps</i></span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="main" data-tiles="main" data-pick="1,2">
+    <div>
+      <span class="step">Step 3</span>
+      <h2>The main page is the cockpit</h2>
+      <p>It tells you <b>which</b> session wants you, not just how many.</p>
+      <ul>
+        <li><b>Overview</b> <span>- every session as a square in its state colour, under a headline for the most urgent thing.</span></li>
+        <li><b>Next</b> <span>- the one session that most needs you, in full. Press to go there.</span></li>
+        <li><b>Slots</b> <span>- your sessions, live. Press to jump to the pane; hold to interrupt.</span></li>
+        <li><b>Allow</b> <span>- the pending command, spelled out. Press to approve; hold to look.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="calm" data-tiles="calm">
+    <div>
+      <span class="step">Step 3, later</span>
+      <h2>…and quiet when nothing needs you</h2>
+      <p>No red, no blinking. A working tile turns a spinner and runs a wave along its edge; a finished one shows how long ago and on which model.</p>
+      <ul>
+        <li><b>coral</b> <span>working</span> · <b>green</b> <span>your turn</span> · <b>red</b> <span>blocked on you</span></li>
+        <li><b>purple</b> <span>errored</span> · <b>amber</b> <span>out of usage</span> · <b>grey</b> <span>idle</span></li>
+        <li><b>The bar on top</b> <span>is the context window filling up.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="list" data-tiles="list" data-pick="7,8,9">
+    <div>
+      <span class="step">Step 4</span>
+      <h2>Open Claude Sessions</h2>
+      <p>Five sessions a page. A sixth starts page two, and the bottom row comes with it.</p>
+      <ul>
+        <li><b>session</b> <span>- your five-hour window: how much is used, when it resets.</span></li>
+        <li><b>weekly</b> <span>- all models, this week.</span></li>
+        <li><b>pace</b> <span>- at this rate, do you reach the reset? It says where you land, or how long until you run out.</span></li>
+        <li><b>Side bars</b> <span>mark the pane you are actually typing in.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="page" data-tiles="page" data-pick="4,5,6,7">
+    <div>
+      <span class="step">Step 5</span>
+      <h2>Press a session: its own page</h2>
+      <p>Everything about one session, and everything about it you can change.</p>
+      <ul>
+        <li><b>info</b> <span>- context in % and tokens, branch, turns, age.</span></li>
+        <li><b>model · effort · mode</b> <span>- tap to step through the choices.</span></li>
+        <li><b>The tile</b> <span>- press to jump to its pane, hold to interrupt it.</span></li>
+        <li><b>‹ sessions</b> <span>- back up, with a dot for every other session. Hold it to go straight to the one that needs you most.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="answer" data-tiles="answer" data-pick="4,5,6">
+    <div>
+      <span class="step">Step 6</span>
+      <h2>Answer a prompt from the keypad</h2>
+      <p>A blocked tile shows <b>the command it wants to run</b>. Its answers come first on its page.</p>
+      <ul>
+        <li><b>yes</b> · <b>always</b> · <b>no</b> <span>- typed into that exact pane, and only if the prompt is still open.</span></li>
+        <li><b>Guarded.</b> <span>Keys refuse to type unless the right terminal is in front.</span></li>
+        <li><b>‹ sessions turns red</b> <span>and names the session when <i>another</i> one needs you.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="question" data-tiles="question" data-pick="4,5,6">
+    <div>
+      <span class="step">Step 6, also</span>
+      <h2>Multiple choice: the real options</h2>
+      <p>When Claude asks a question, the tile shows the question and the keys show its <b>actual answers</b>.</p>
+      <ul>
+        <li><span>They appear only when every option fits - three of four would be worse than none.</span></li>
+        <li><span>One question at a time; anything more involved is left to the terminal.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="step" data-tiles="step" data-pick="6">
+    <div>
+      <span class="step">Step 7</span>
+      <h2>Tap to change, commit when you stop</h2>
+      <p>Each tap steps to the next choice, ringed in white. The bar runs down; when it is empty the change is sent - <b>once</b>.</p>
+      <ul>
+        <li><span><kbd>high</kbd> → <kbd>xhigh</kbd> → <kbd>max</kbd> is one <kbd>/effort max</kbd>, not three commands.</span></li>
+        <li><span>Tap all the way round to where you started and nothing is sent.</span></li>
+        <li><span>Same gesture for <b>model</b> and <b>permission mode</b>.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="scene" id="apps" data-tiles="apps" data-pick="2">
+    <div>
+      <span class="step">Step 8</span>
+      <h2>App Switcher: a Cmd-Tab you can see</h2>
+      <p>Press an app and it comes forward; the folder closes itself.</p>
+      <ul>
+        <li><b>Pinned apps never move</b> <span>- Warp first by default. The rest are most-recently-used, frozen while the folder is open.</span></li>
+        <li><b>The badge</b> <span>is your Claude sessions in that terminal: red 1 means one is blocked on you.</span></li>
+        <li><b>White bar</b> <span>= in front.</span> <b>Dimmed</b> <span>= hidden.</span> <b>Hold</b> <span>to hide an app.</span></li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Build each scene's keypad from its tiles, then - if the URL names a scene - show only that one.
+  for (const scene of document.querySelectorAll(".scene[data-tiles]")) {
+    const picked = new Set((scene.dataset.pick || "").split(",").filter(Boolean).map(Number));
+    const keypad = document.createElement("div");
+    keypad.className = "keypad";
+    keypad.innerHTML = '<div class="keys">' +
+      Array.from({ length: 9 }, (_, i) =>
+        `<div class="key${picked.has(i + 1) ? " pick" : ""}"><img alt="" src="tiles/${scene.dataset.tiles}-${i + 1}.png"></div>`).join("") +
+      '</div><div class="nav"><i>‹</i><i>›</i><b>logi</b></div>';
+    scene.prepend(keypad);
+  }
+  const wanted = location.hash.slice(1);
+  if (wanted) {
+    document.body.classList.add("single");
+    document.getElementById(wanted)?.classList.add("show");
+  }
+</script>
+</body>
+</html>

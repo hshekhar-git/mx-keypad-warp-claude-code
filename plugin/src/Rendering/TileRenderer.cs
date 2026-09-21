@@ -1000,7 +1000,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         }
 
         // Fits a name to a length by taking the middle out, because names that share a prefix
-        // (web-app, api) are told apart by how they end.
+        // (shop-web, shop-api) are told apart by how they end.
         private static String Middle(String value, Int32 max)
         {
             value = (value ?? "").Trim();
