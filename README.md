@@ -140,9 +140,24 @@ limited; any later reply, or the reset time passing, means not.
   web-app   ← project (git top level)
  Landing page   ← Claude's own session title, else your last prompt
  hero rework
-   Bash 2:31    ← what it is doing right now, and for how long
-▁▁▁▁███▁▁▁▁▁▁▁  ← sweep while busy
+✻  Bash 2:31    ← what it is doing right now, and for how long - behind Claude's own spinner
+▂▃▅▇▅▃▂▁▂▃▅▆▅▃  ← a wave of block characters flowing past while it works
 ```
+
+**The tiles move.** Everything animated is drawn from characters, four frames a second:
+
+| When | What you see |
+|---|---|
+| working | the stars Claude Code itself spins - `✳ ✶ ✻ ✽` - growing and shrinking beside the status, and two sine waves of `▁▂▃▄▅▆▇█` sliding past each other along the bottom edge |
+| blocked on you | the tile blinks, a `!` flashes, and arrows close in on the question: `>  allow Bash?  <` → `> allow Bash? <` → `>allow Bash?<` |
+| a turn just finished | three seconds of sparkle, then it settles to `✓ done 0:03` |
+| tapping model / effort / mode | a bar runs down - `[======]` → `[===---]` → `[=-----]` - showing how long until your taps are taken as final |
+| nothing to show | `\(^_^)/ all clear`, `(-_-) zzZ no sessions`, `[   ]` for an empty slot |
+
+Only glyphs that were rendered and checked are used: the key font draws braille, block elements, a
+few stars, ticks and arrows, and a box for much else (the middle dot, left-pointing triangles) - and a
+space beside a special glyph also comes out as a box, so those are drawn on their own. Animation only
+runs for tiles that are actually moving. `"style": "plain"` in the config turns it all off.
 
 | Colour | State | From |
 |---|---|---|
@@ -151,9 +166,7 @@ limited; any later reply, or the reset time passing, means not.
 | red, blinking | **attention** — blocked on you. A permission prompt shows *the command it wants to run*; `AskUserQuestion` shows "asks you"; `ExitPlanMode` shows "plan ready" | `PermissionRequest`, `Notification`, `PreToolUse` |
 | purple | **error** — the turn died | `StopFailure` |
 | amber | **limit** — out of usage until the time shown | the transcript's `rate_limit` reply |
-| grey | **idle** | `SessionStart` |
-
-
+| grey | **idle** - with a short model tag, as on finished tiles: `idle · F5.1` | `SessionStart` |
 
 ## App Switcher
 
@@ -204,14 +217,18 @@ without opening it.
 
 | Key | Shows | Press |
 |---|---|---|
-| **Needs me** | count of sessions blocked on you — else errored, else finished, else working | cycles through exactly the sessions it counts, longest-waiting first |
-| **Working** | how many are still running | cycles through them |
+| **Overview**, **Next**, **Session slot 1-8** | see [The main page](#the-main-page) | |
+| **Usage: session / weekly / pace** | see [Plan usage on the keypad](#plan-usage-on-the-keypad) | nothing - they are gauges |
+| **Needs me** | one number: the size of the most urgent group that has anyone in it - blocked on you, else errored, else at the usage limit, else finished - in that group's colour and under its name. With nobody waiting: how many are working | walks exactly the sessions it is counting, longest-waiting first |
+| **Working** | how many are still running | walks them |
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
 | **Model** | the target session's model, and whether it is on the 1M window | steps to the next model; commits when you stop tapping |
 | **Effort** | its effort level | steps `auto → low → medium → high → xhigh → max` |
 | **Permission mode** | `ask`, `auto-edit`, `plan`, and `bypass` / `auto` where enabled | steps it (Shift-Tab) |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |
+| **App Switcher**, **Open App** | see [App Switcher](#app-switcher) | |
+| **Models** | a folder: every configured model, the one in use marked | sets it - see [Model switch](#model-switch) |
 
 **Haptics (MX Master 4)** — three events, remappable in Options+: *Claude needs you* (`knock`),
 *Claude finished* (`completed`, only for turns longer than 20 s), *Claude errored* (`angry_alert`).
@@ -308,13 +325,19 @@ waveform there.
 
 1. Open a **new** Warp tab and run `claude`. Hooks are read when a session starts, so sessions that
    were already running only show up on their next tool call.
-2. Press **Claude Sessions** on the keypad. You should see a **grey** tile named after the folder.
-3. Send a prompt. The tile turns **coral** with a moving bar and shows the tool in use.
-4. When Claude finishes it turns **green**; *Needs me* on your home page shows `1`.
+2. Press **Claude Sessions** on the keypad. You should see a **grey** tile named after the folder,
+   above the three usage keys.
+3. Send a prompt. The tile turns **coral**, a star spins beside the tool it is using, and a wave
+   flows along its bottom edge.
+4. When Claude finishes it turns **green**; on your home page *Overview* reads `1 your turn` and
+   *Next* shows that session.
 5. Click into another app, press **App Switcher**, press **Warp** - Warp comes forward and the folder
    closes.
 6. Ask Claude to run something it needs permission for (`run ls in /tmp`). The tile blinks **red** and
-   shows the command; the bottom keys become **yes / always / no**.
+   shows the command. Press the tile to open that session's page: **yes / always / no** are the keys
+   right after it. (*Allow* on the home page shows the same prompt and approves it in one press.)
+7. On that page, tap **effort** a couple of times and stop: about a second and a half later
+   `/effort <level>` is typed into the session and the key shows the new level.
 
 No tile? `ls ~/.claude/deck/sessions/` should hold one `.json` per running session. If it is empty
 the hooks are not firing - see below.
@@ -380,25 +403,47 @@ actions work on every profile.
 
 ## Configuration
 
-`~/.claude/deck/config.json`, re-read within a second. See [`config.example.json`](config.example.json)
-— tile text source, context-window sizes per model, haptic toggles, and the command row.
-Session tiles get `8 − keys` slots per page, so a shorter row means more sessions per page.
+`~/.claude/deck/config.json` - comments allowed, re-read within a second of saving, no restart. A file
+that does not parse keeps the previous settings. [`config.example.json`](config.example.json) is the
+annotated version; the installer seeds your copy from it.
+
+| Setting | What it controls |
+|---|---|
+| `label` | the main text on a tile: `"title"` (Claude's own session title, else your last prompt), `"prompt"`, or `"slug"` |
+| `style` | `"ascii"` (animated, the default) or `"plain"` |
+| `showContext` | the context-window gauge along the top of each tile |
+| `contextWindow`, `contextWindows` | the window size the gauge is measured against, when Claude Code has not said (it usually has - see [Plan usage](#plan-usage-on-the-keypad)) |
+| `haptics` | `attention` / `done` / `error` on or off, and `minTurnSeconds`: a turn shorter than this finishing is not announced |
+| `sessions` | `group`: `"flat"` or `"tab"` (one page per Warp tab) · `focusOnOpen`: opening a session also brings its pane forward · `usageRow`: the three usage keys under the list |
+| `models` | what **Model** steps through and **Models** lists: `alias` (typed after `/model`), `label`, `match`, `color` |
+| `apps` | the App Switcher: `pinned` and `hidden` bundle ids, `order` (`recent` / `launch` / `name`), `closeOnSwitch` |
+| `keys` | the command keys on every session's page, also published under **Commands** for your home page: `label`, `text`, `submit`, `key` (`"escape"`), `color`, and an optional `id` |
+
+A key you have placed from **Commands** is remembered by its `id` - or, without one, by what it
+*does* (its text, whether it submits, the special key it sends). So relabelling or reordering keys
+never unbinds one, and giving a key an `id` lets you change even what it types.
 
 ## How it works
 
 ```
- NSWorkspace events ─► deck-apps (Swift) ─ JSON lines ─► AppWatcher ─► App Switcher, "here", badges
-
-claude ─ hooks ─► deck-hook.sh ─ one jq call, atomic write ─► ~/.claude/deck/sessions/<key>.json
-                  key = Warp pane uuid, else Claude session id                │
-                                                             FileSystemWatcher + 2 s poll
- warp.sqlite ─ read-only ─► tab grouping ─┐                                   ▼
- transcript tail ─► title, tokens, model ─┴──────────────────────────► SessionStore
-                                                                  │            │
-                                                          tiles + keys    state transitions
-                                                                               ▼
-                                                                  haptic events → MX Master 4
+ claude ─ hooks (11 events) ─► deck-hook.sh ─ one jq run, atomic write ─► sessions/<key>.json ──┐
+          key = Warp pane uuid, else Claude session id                                          │
+                                                                                                │
+ claude ─ status line ───────► deck-statusline.sh ─► usage.json            (plan usage) ────────┤
+                                                  └► status/<session>.json (model, effort, ctx) │
+                                                                                                ▼
+ warp.sqlite ─ read-only, JSON ─► which tab, which pane has the keyboard ─┐   FolderWatch: a burst of
+ transcript tail ─► title, /model and /effort history, usage-limit hits ──┤   writes settles into one
+                                                                          ▼   reload, plus a 2 s check
+ NSWorkspace ─► deck-apps (Swift) ─ a JSON line per change ─► AppWatcher ─► SessionStore
+                                                                  │              │
+                          App Switcher, "you are here", badges ◄──┘              ├─► every key and tile
+                                                                                 └─► state changes ─► haptic
+                                                                                     events ─► MX Master 4
 ```
+
+Everything under `~/.claude/deck/`: `sessions/` (one file per live session), `status/`, `usage.json`,
+`icons/` (app icons, cached), `config.json`, and the installed copies of the two scripts.
 
 The hooks and the plugin never talk to each other directly: a hook writes a small JSON file and is
 done, and the plugin watches the folder. That is deliberate. A hook runs inside your Claude session,
@@ -416,12 +461,43 @@ DYLD_LIBRARY_PATH=/Applications/Utilities/LogiPluginService.app/Contents/MonoBun
 tail -f ~/Library/Application\ Support/Logi/LogiPluginService/Logs/plugin_logs/ClaudeDeck.log
 ```
 
+```
+install.sh                    prerequisites, build, hooks, load, verify        (--check, --uninstall)
+hooks/deck-hook.sh            the Claude Code hook: one session's state -> one JSON file
+hooks/deck-statusline.sh      the status line tap: plan usage, and each session's model/effort/context
+hooks/install-hooks.sh        edits ~/.claude/settings.json - additive, idempotent, reversible
+helper/deck-apps.swift        native app watcher: pushes running/frontmost apps, extracts icons
+plugin/src/
+  ClaudeDeckPlugin.cs         lifetime of the background pieces; state changes -> haptic events
+  Actions/                    everything you can put on a key
+    SessionsFolder.cs           the list, and a page per session
+    MainPageCommands.cs         Overview, Next, Session slots
+    SessionKeyCommand.cs        Needs me, Working, Allow - and Urgency, the one ranking they all use
+    ModelCommand.cs             Model, Effort, Permission mode     ModelsFolder.cs
+    UsageCommand.cs             the usage gauges                   AppSwitcherFolder.cs, OpenAppCommand.cs
+    ConfiguredKeyCommand.cs     keys from config.json              SendToClaudeCommand.cs
+  Sessions/                   SessionStore (the source of truth), TranscriptStats, UsageStore, Settings
+                              (tap-to-step), Deck (what a press does), DeckConfig, ModelNames, HookStatus
+  Term/                       WarpTabs (layout), TermFocus (go to a pane), TermInput (guarded typing)
+  Apps/                       AppWatcher, Apps
+  Rendering/TileRenderer.cs   every pixel
+  Helpers/                    FolderWatch, Shell, PluginLog, NoApplication
+  package/                    manifest, icon, haptic event definitions
+tools/                        preview.fsx (tiles -> PNG), make-icon.swift
+```
+
 ## Limits
 
-- macOS only. Exact-pane focus is Warp only; other terminals are activated as an app.
-- `warp.sqlite` is Warp's internal schema; if it changes, Warp sessions collapse onto one page —
-  status and focus keep working.
-- Sessions that were already running before the hooks were installed appear on their next event.
+- macOS only. Exact-pane focus is Warp only; in any other terminal a press brings the *app* forward.
+- `warp.sqlite` is Warp's private format. If it changes, the query fails quietly and Warp sessions
+  are listed by app instead of by tab, without the "you are here" mark; status and focus carry on.
+- A session that was already running when the hooks were installed appears on its next event.
+- Plan usage covers the five-hour and weekly (all models) windows - the two the status line carries.
+  The numbers are as fresh as the most recently active session's last API response.
+- Permission mode is only reported when something happens in the session, so just after a change the
+  key shows what it set and the next event confirms it.
+- Keys that type (answers, command keys, model / effort / mode) need Accessibility, and refuse to
+  type unless the expected terminal is in front; model and effort are also refused mid-turn.
 
 The plugin's internal id is `ClaudeDeck` (log file name, reload URL, `~/.claude/deck/`). It is kept
 stable on purpose: Options+ binds the keys you have placed to that id.

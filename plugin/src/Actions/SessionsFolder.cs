@@ -494,7 +494,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             if (actionParameter == Notice)
             {
                 return HookStatus.Installed
-                    ? TileRenderer.Message("No sessions", "start claude in a terminal", imageSize)
+                    ? TileRenderer.Message(DeckConfig.Ascii ? TileRenderer.Ascii.Asleep : "No sessions", "no sessions - start claude in a terminal", imageSize)
                     : TileRenderer.Message("Not set up", "run ./install.sh", imageSize);
             }
 

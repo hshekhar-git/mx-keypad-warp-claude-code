@@ -5,6 +5,11 @@
   //   "slug"   - the session slug Warp shows on the tab
   "label": "title",
 
+  // "ascii": tiles move - a star spinner and a flowing block wave while Claude works, arrows closing
+  // in on a prompt, a sparkle when a turn finishes, a countdown bar on the tap-to-step keys, and a
+  // little ASCII art on the empty states. "plain": none of it; a working tile shows three dots.
+  "style": "ascii",
+
   // The gauge along the top of each tile: how full the context window is. Yellow past 80%.
   "showContext": true,
 

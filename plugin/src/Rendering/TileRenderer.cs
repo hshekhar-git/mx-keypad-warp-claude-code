@@ -36,7 +36,18 @@ namespace Loupedeck.ClaudeDeckPlugin
         // A blink is half a second bright, half a second dim: two ticks each way.
         private static Boolean IsDimBeat(Int32 frame) => (frame & 2) != 0;
 
-        public static Boolean Animates(SessionInfo s) => s.State is "busy" or "attention";
+        // How long a tile celebrates a finished turn before settling down.
+        private const Int64 SparkleSeconds = 3;
+
+        private static Boolean JustFinished(SessionInfo s) =>
+            DeckConfig.Ascii && s.State == "done" && !s.IsLimited
+            && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - s.Since < SparkleSeconds;
+
+        // One second longer than the sparkle itself, so the last repaint is of the settled tile.
+        public static Boolean Animates(SessionInfo s) =>
+            s.State is "busy" or "attention"
+            || (DeckConfig.Ascii && s.State == "done" && !s.IsLimited
+                && DateTimeOffset.UtcNow.ToUnixTimeSeconds() - s.Since <= SparkleSeconds);
 
         public static BitmapImage Session(SessionInfo s, Boolean selected, Boolean flash, PluginImageSize size, Int32 frame, String header = null)
         {
@@ -60,11 +71,29 @@ namespace Loupedeck.ClaudeDeckPlugin
             // Project, what it is about, what it is doing right now.
             Band(b, header ?? Middle(Or(s.Project, "—"), 15), 0.03, 0.17, 11, header != null ? fg : soft, top);
             Band(b, What(s), 0.20, 0.50, 13, fg, top);
-            Band(b, Status(s), 0.74, 0.18, 11, soft);
+            var glyph = DeckConfig.Ascii ? Ascii.Glyph(s, frame, JustFinished(s)) : "";
+            var status = DeckConfig.Ascii ? Ascii.Frame(s, Status(s), frame) : Status(s);
+            if (glyph.Length > 0)
+            {
+                // Drawn by itself: a space beside a glyph from the fallback font comes out as a box.
+                b.DrawText(glyph, 3, (Int32)(h * 0.735), 16, (Int32)(h * 0.18), BitmapColor.White, 12);
+                b.DrawText(status, 18, (Int32)(h * 0.74), w - 22, (Int32)(h * 0.18), soft, 11);
+            }
+            else
+            {
+                Band(b, status, 0.74, 0.18, 11, soft);
+            }
 
             if (s.State == "busy")
             {
-                DrawWorking(b, bg, frame);
+                if (DeckConfig.Ascii)
+                {
+                    b.DrawText(Ascii.Wave(frame, 19), 0, (Int32)(h * 0.905), w, (Int32)(h * 0.11), Tint(bg, 0.55), 9);
+                }
+                else
+                {
+                    DrawWorking(b, bg, frame);
+                }
             }
 
             // The session the command row will act on.
@@ -158,7 +187,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     {
                         "question" => "asks you",
                         "plan" => "plan ready",
-                        _ => $"allow {Or(ToolName(s.Tool), "it")}?",
+                        _ => $"allow {Or(Tight(ToolName(s.Tool)), "it")}?",
                     };
                 // A resting tile has room to say which model it is on; a working one does not.
                 case "done":
@@ -169,6 +198,10 @@ namespace Loupedeck.ClaudeDeckPlugin
                     return $"idle{ModelTag(s)}";
             }
         }
+
+        // The status line shares its row with a mark when animation is on, which leaves it less room.
+        private static String Tight(String name) =>
+            DeckConfig.Ascii && name.Length > 8 ? name.Substring(0, 7) + "…" : name;
 
         private static String ModelTag(SessionInfo s) => s.Selected.IsKnown ? $" · {s.Selected.Short}" : "";
 
@@ -442,7 +475,15 @@ namespace Loupedeck.ClaudeDeckPlugin
             var h = b.Height;
             b.Clear(Empty);
             Band(b, "NEXT", 0.05, 0.18, 11, Tint(Empty, 0.45));
-            Band(b, total == 0 ? "no sessions" : "all clear", 0.28, 0.34, 16, Tint(Empty, 0.75));
+            if (DeckConfig.Ascii)
+            {
+                Band(b, total == 0 ? Ascii.Asleep : Ascii.Happy, 0.24, 0.22, 14, Tint(Empty, 0.8));
+                Band(b, total == 0 ? "no sessions" : "all clear", 0.48, 0.20, 12, Tint(Empty, 0.6));
+            }
+            else
+            {
+                Band(b, total == 0 ? "no sessions" : "all clear", 0.28, 0.34, 16, Tint(Empty, 0.75));
+            }
             Band(b, working > 0 ? $"{working} working" : total > 0 ? "nothing running" : "start claude", 0.72, 0.18, 11, working > 0 ? Tint(Busy, 0.4) : Tint(Empty, 0.45));
             return b.ToImage();
         }
@@ -451,7 +492,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             using var b = new BitmapBuilder(size);
             b.Clear(Empty);
-            Band(b, "–", 0.26, 0.36, 22, Tint(Empty, 0.25));
+            Band(b, DeckConfig.Ascii ? "[   ]" : "–", 0.26, 0.36, DeckConfig.Ascii ? 16 : 22, Tint(Empty, 0.25));
             Band(b, $"slot {number}", 0.72, 0.18, 11, Tint(Empty, 0.3));
             return b.ToImage();
         }
@@ -807,6 +848,86 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             return "";
+        }
+
+        // Character-frame animation. Everything here is built from glyphs that were rendered and looked
+        // at first: the key font draws braille, the block elements, a few stars, ticks and arrows - and
+        // draws a box for a good deal else (the middle dot, left-pointing triangles, solid stars).
+        public static class Ascii
+        {
+            // The stars Claude Code itself spins while it thinks, growing and shrinking.
+            private static readonly String[] Stars = { "✳", "✶", "✻", "✽", "✻", "✶" };
+
+            private static readonly String[] Blocks = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
+
+            // The symbol in front of the status line.
+            public static String Glyph(SessionInfo s, Int32 frame, Boolean justFinished)
+            {
+                if (s.IsLimited)
+                {
+                    return "";
+                }
+
+                return s.State switch
+                {
+                    "busy" => Stars[frame % Stars.Length],
+                    "done" => justFinished ? Stars[frame % Stars.Length] : "✓",
+                    // A space when it is "off": the slot stays occupied, so the text beside it does
+                    // not jump sideways every time the mark blinks.
+                    "attention" => (frame & 1) == 0 ? "!" : " ",
+                    "error" => "x",
+                    _ => "",
+                };
+            }
+
+            // The status line itself. A blocked tile gets arrows that close in on what it is asking.
+            public static String Frame(SessionInfo s, String status, Int32 frame)
+            {
+                if (s.State != "attention" || s.IsLimited)
+                {
+                    return status;
+                }
+
+                // No room for arrows beside a long one without wrapping it; the blinking mark is enough.
+                if (status.Length > 12)
+                {
+                    return status;
+                }
+
+                return (frame % 3) switch
+                {
+                    0 => $">  {status}  <",
+                    1 => $"> {status} <",
+                    _ => $">{status}<",
+                };
+            }
+
+            // Two sine waves of block characters sliding past each other along the bottom of a
+            // working tile - an equaliser that says "busy" without a word.
+            public static String Wave(Int32 frame, Int32 width)
+            {
+                var chars = new System.Text.StringBuilder(width);
+                for (var i = 0; i < width; i++)
+                {
+                    var level = (Math.Sin((i * 0.75) - (frame * 0.9)) + Math.Sin((i * 0.31) + (frame * 0.45))) / 2.0;
+                    chars.Append(Blocks[(Int32)Math.Round((level + 1) / 2.0 * (Blocks.Length - 1))]);
+                }
+
+                return chars.ToString();
+            }
+
+            // A bar that empties over the time a tap-to-step key waits before it commits. Spent cells
+            // are drawn, not left blank: the key font is proportional and squeezes runs of spaces, so
+            // a bar made with them would shrink instead of emptying.
+            public static String Countdown(Double remaining, Int32 cells = 6)
+            {
+                var full = (Int32)Math.Ceiling(Math.Clamp(remaining, 0, 1) * cells);
+                return "[" + new String('=', full) + new String('-', cells - full) + "]";
+            }
+
+            public const String Asleep = "(-_-) zzZ";
+            public const String Happy = "\\(^_^)/";
+            public const String Waiting = "( o_o)";
         }
 
         // Every tile is laid out as horizontal bands: a line of text occupies the stretch of the key

@@ -194,6 +194,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         private readonly Timer _commit;
         private readonly Timer _clearNotice;
 
+        // Redraws the key while a change is pending, so its countdown can be seen running down.
+        private readonly Timer _countdown;
+        private Int64 _commitsAtTicks;
+
         // Fixed at the first tap, so a change of focus mid-gesture cannot redirect the change.
         private volatile String _sessionKey;
         private volatile Int32 _from = -1;
@@ -204,6 +208,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             this.Setting = setting;
             this._commit = new Timer(_ => this.Commit(), null, Timeout.Infinite, Timeout.Infinite);
+            this._countdown = new Timer(_ => this.Changed?.Invoke(this, EventArgs.Empty), null, Timeout.Infinite, Timeout.Infinite);
             this._clearNotice = new Timer(_ =>
             {
                 this._notice = null;
@@ -238,6 +243,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 this._pending = -1;
                 this._commit.Change(Timeout.Infinite, Timeout.Infinite);
+                this._countdown.Change(Timeout.Infinite, Timeout.Infinite);
                 this.Notice(blocked);
                 return;
             }
@@ -251,11 +257,14 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             this._pending = (this._pending + 1) % options.Count;
             this._commit.Change(CommitMs, Timeout.Infinite);
+            Interlocked.Exchange(ref this._commitsAtTicks, DateTime.UtcNow.AddMilliseconds(CommitMs).Ticks);
+            this._countdown.Change(TileRenderer.FrameMs, TileRenderer.FrameMs);
             this.Changed?.Invoke(this, EventArgs.Empty);
         }
 
         private void Commit()
         {
+            this._countdown.Change(Timeout.Infinite, Timeout.Infinite);
             var to = this._pending;
             var from = this._from;
             var session = SessionStore.Instance.Find(this._sessionKey);
@@ -277,7 +286,10 @@ namespace Loupedeck.ClaudeDeckPlugin
             var pending = this._pending;
             if (pending >= 0 && pending < options.Count)
             {
-                return TileRenderer.Model(this.Setting.Title, options[pending].Label, "tap: next", options[pending].Color, true, false, size);
+                // How long until the taps are taken as final, as a bar running down.
+                var left = (new DateTime(Interlocked.Read(ref this._commitsAtTicks)) - DateTime.UtcNow).TotalMilliseconds / CommitMs;
+                var hint = DeckConfig.Ascii ? TileRenderer.Ascii.Countdown(left) : "tap: next";
+                return TileRenderer.Model(this.Setting.Title, options[pending].Label, hint, options[pending].Color, true, false, size);
             }
 
             if (target == null)
@@ -296,6 +308,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             this.Changed = null;
             this._commit.Dispose();
+            this._countdown.Dispose();
             this._clearNotice.Dispose();
         }
     }

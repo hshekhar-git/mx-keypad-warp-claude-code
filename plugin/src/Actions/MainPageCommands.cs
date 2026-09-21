@@ -136,6 +136,16 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             this._frame++;
             var all = SessionStore.Instance.All;
+
+            // A sparkle ends by the clock, not by an event, so it is here that the ticking notices
+            // there is nothing left to animate - after one last repaint to show the settled tile.
+            if (!all.Take(Slots).Any(TileRenderer.Animates))
+            {
+                this._tick.Change(Timeout.Infinite, Timeout.Infinite);
+                this.ActionImageChanged();
+                return;
+            }
+
             for (var i = 0; i < Math.Min(Slots, all.Count); i++)
             {
                 if (TileRenderer.Animates(all[i]))

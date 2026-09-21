@@ -75,6 +75,9 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public static Boolean ShowContext => _current.ShowContext;
 
+        // "ascii": character-frame animation and a little ASCII art. "plain": neither.
+        public static Boolean Ascii => _current.Style != "plain";
+
         public static Boolean HapticAttention => _current.HapticAttention;
 
         public static Boolean HapticDone => _current.HapticDone;
@@ -200,6 +203,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             public String Label { get; private set; } = "title";
             public IReadOnlyList<KeyDef> Keys { get; private set; } = DefaultKeys();
             public Boolean ShowContext { get; private set; } = true;
+            public String Style { get; private set; } = "ascii";
             public Boolean HapticAttention { get; private set; } = true;
             public Boolean HapticDone { get; private set; } = true;
             public Boolean HapticError { get; private set; } = true;
@@ -245,6 +249,11 @@ namespace Loupedeck.ClaudeDeckPlugin
                     {
                         s.Label = v;
                     }
+                }
+
+                if (Str(root, "style").ToLowerInvariant() is "ascii" or "plain")
+                {
+                    s.Style = Str(root, "style").ToLowerInvariant();
                 }
 
                 if (root.TryGetProperty("showContext", out var ctx) && ctx.ValueKind is JsonValueKind.True or JsonValueKind.False)
