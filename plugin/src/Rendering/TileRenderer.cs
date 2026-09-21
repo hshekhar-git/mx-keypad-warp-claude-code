@@ -71,18 +71,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             // Project, what it is about, what it is doing right now.
             Band(b, header ?? Middle(Or(s.Project, "—"), 15), 0.03, 0.17, 11, header != null ? fg : soft, top);
             Band(b, What(s), 0.20, 0.50, 13, fg, top);
-            var glyph = DeckConfig.Ascii ? Ascii.Glyph(s, frame, JustFinished(s)) : "";
-            var status = DeckConfig.Ascii ? Ascii.Frame(s, Status(s), frame) : Status(s);
-            if (glyph.Length > 0)
-            {
-                // Drawn by itself: a space beside a glyph from the fallback font comes out as a box.
-                b.DrawText(glyph, 3, (Int32)(h * 0.735), 16, (Int32)(h * 0.18), BitmapColor.White, 12);
-                b.DrawText(status, 18, (Int32)(h * 0.74), w - 22, (Int32)(h * 0.18), soft, 11);
-            }
-            else
-            {
-                Band(b, status, 0.74, 0.18, 11, soft);
-            }
+            // The mark and the words are one string, so the mark sits beside the words and on their
+            // baseline by construction - which also means it has to come from the key's main font.
+            Band(b, DeckConfig.Ascii ? Ascii.Status(s, Status(s), frame, JustFinished(s)) : Status(s), 0.74, 0.18, 11, soft);
 
             if (s.State == "busy")
             {
@@ -187,7 +178,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     {
                         "question" => "asks you",
                         "plan" => "plan ready",
-                        _ => $"allow {Or(Tight(ToolName(s.Tool)), "it")}?",
+                        _ => $"allow {Or(ToolName(s.Tool), "it")}?",
                     };
                 // A resting tile has room to say which model it is on; a working one does not.
                 case "done":
@@ -198,10 +189,6 @@ namespace Loupedeck.ClaudeDeckPlugin
                     return $"idle{ModelTag(s)}";
             }
         }
-
-        // The status line shares its row with a mark when animation is on, which leaves it less room.
-        private static String Tight(String name) =>
-            DeckConfig.Ascii && name.Length > 8 ? name.Substring(0, 7) + "…" : name;
 
         private static String ModelTag(SessionInfo s) => s.Selected.IsKnown ? $" · {s.Selected.Short}" : "";
 
@@ -850,56 +837,58 @@ namespace Loupedeck.ClaudeDeckPlugin
             return "";
         }
 
-        // Character-frame animation. Everything here is built from glyphs that were rendered and looked
-        // at first: the key font draws braille, the block elements, a few stars, ticks and arrows - and
-        // draws a box for a good deal else (the middle dot, left-pointing triangles, solid stars).
+        // Character-frame animation. Every glyph here was rendered and looked at first, because the key
+        // font is particular: half-circles, dots, diamonds, a tick, right-pointing arrows and the block
+        // elements are in it; the middle dot, left-pointing triangles and solid stars are not.
         public static class Ascii
         {
-            // The stars Claude Code itself spins while it thinks, growing and shrinking.
-            private static readonly String[] Stars = { "✳", "✶", "✻", "✽", "✻", "✶" };
+            // A half-filled circle, turning. Like everything that shares a string with words, these come
+            // from the key's main font: the renderer uses ONE typeface per string, and a glyph it has to
+            // fetch from a symbol font (a star, braille) drags the whole string there - where there
+            // are no letters, so the words come out as boxes.
+            private static readonly String[] Turning = { "◐", "◓", "◑", "◒" };
+
+            private static readonly String[] Twinkle = { "◇", "◆" };
 
             private static readonly String[] Blocks = { "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█" };
 
-            // The symbol in front of the status line.
-            public static String Glyph(SessionInfo s, Int32 frame, Boolean justFinished)
+            // The status line with its mark: a spinner while working, a twinkle and then a tick when
+            // done, arrows closing in on whatever a blocked session is asking.
+            public static String Status(SessionInfo s, String words, Int32 frame, Boolean justFinished)
             {
                 if (s.IsLimited)
                 {
-                    return "";
+                    return words;
                 }
 
-                return s.State switch
+                switch (s.State)
                 {
-                    "busy" => Stars[frame % Stars.Length],
-                    "done" => justFinished ? Stars[frame % Stars.Length] : "✓",
-                    // A space when it is "off": the slot stays occupied, so the text beside it does
-                    // not jump sideways every time the mark blinks.
-                    "attention" => (frame & 1) == 0 ? "!" : " ",
-                    "error" => "x",
-                    _ => "",
-                };
-            }
+                    case "busy":
+                        return $"{Turning[frame % Turning.Length]} {words}";
 
-            // The status line itself. A blocked tile gets arrows that close in on what it is asking.
-            public static String Frame(SessionInfo s, String status, Int32 frame)
-            {
-                if (s.State != "attention" || s.IsLimited)
-                {
-                    return status;
+                    case "done":
+                        return $"{(justFinished ? Twinkle[frame % Twinkle.Length] : "✓")} {words}";
+
+                    case "error":
+                        return $"x {words}";
+
+                    case "attention":
+                        // A long question has no room for the run-up; it keeps a plain mark instead.
+                        if (words.Length > 12)
+                        {
+                            return $"! {words}";
+                        }
+
+                        return (frame % 3) switch
+                        {
+                            0 => $">  {words}  <",
+                            1 => $"> {words} <",
+                            _ => $">{words}<",
+                        };
+
+                    default:
+                        return words;
                 }
-
-                // No room for arrows beside a long one without wrapping it; the blinking mark is enough.
-                if (status.Length > 12)
-                {
-                    return status;
-                }
-
-                return (frame % 3) switch
-                {
-                    0 => $">  {status}  <",
-                    1 => $"> {status} <",
-                    _ => $">{status}<",
-                };
             }
 
             // Two sine waves of block characters sliding past each other along the bottom of a

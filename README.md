@@ -140,7 +140,7 @@ limited; any later reply, or the reset time passing, means not.
   web-app   ← project (git top level)
  Landing page   ← Claude's own session title, else your last prompt
  hero rework
-✻  Bash 2:31    ← what it is doing right now, and for how long - behind Claude's own spinner
+ ◐ Bash 2:31    ← what it is doing right now, and for how long - behind a turning spinner
 ▂▃▅▇▅▃▂▁▂▃▅▆▅▃  ← a wave of block characters flowing past while it works
 ```
 
@@ -148,16 +148,17 @@ limited; any later reply, or the reset time passing, means not.
 
 | When | What you see |
 |---|---|
-| working | the stars Claude Code itself spins - `✳ ✶ ✻ ✽` - growing and shrinking beside the status, and two sine waves of `▁▂▃▄▅▆▇█` sliding past each other along the bottom edge |
-| blocked on you | the tile blinks, a `!` flashes, and arrows close in on the question: `>  allow Bash?  <` → `> allow Bash? <` → `>allow Bash?<` |
-| a turn just finished | three seconds of sparkle, then it settles to `✓ done 0:03` |
+| working | a half-filled circle turning beside the status - `◐ ◓ ◑ ◒` - and two sine waves of `▁▂▃▄▅▆▇█` sliding past each other along the bottom edge |
+| blocked on you | the tile blinks and arrows close in on the question: `>  allow Bash?  <` → `> allow Bash? <` → `>allow Bash?<` |
+| a turn just finished | three seconds of a twinkling diamond - `◇ ◆` - then it settles to `✓ done 0:03` |
 | tapping model / effort / mode | a bar runs down - `[======]` → `[===---]` → `[=-----]` - showing how long until your taps are taken as final |
 | nothing to show | `\(^_^)/ all clear`, `(-_-) zzZ no sessions`, `[   ]` for an empty slot |
 
-Only glyphs that were rendered and checked are used: the key font draws braille, block elements, a
-few stars, ticks and arrows, and a box for much else (the middle dot, left-pointing triangles) - and a
-space beside a special glyph also comes out as a box, so those are drawn on their own. Animation only
-runs for tiles that are actually moving. `"style": "plain"` in the config turns it all off.
+Only glyphs that were rendered and checked are used, because the renderer draws each string in **one
+typeface**: a mark that shares a line with words has to come from the key's main font (half-circles,
+dots, diamonds, a tick, right-pointing arrows, block elements are in it), or it drags the whole line
+into a symbol font with no letters and the words come out as boxes - which rules out stars and
+braille beside text. Animation only runs for tiles that are actually moving. `"style": "plain"` in the config turns it all off.
 
 | Colour | State | From |
 |---|---|---|
@@ -327,8 +328,8 @@ waveform there.
    were already running only show up on their next tool call.
 2. Press **Claude Sessions** on the keypad. You should see a **grey** tile named after the folder,
    above the three usage keys.
-3. Send a prompt. The tile turns **coral**, a star spins beside the tool it is using, and a wave
-   flows along its bottom edge.
+3. Send a prompt. The tile turns **coral**, a half-circle turns beside the tool it is using, and a
+   wave flows along its bottom edge.
 4. When Claude finishes it turns **green**; on your home page *Overview* reads `1 your turn` and
    *Next* shows that session.
 5. Click into another app, press **App Switcher**, press **Warp** - Warp comes forward and the folder
