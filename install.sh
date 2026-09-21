@@ -85,6 +85,12 @@ fi
 echo; bold "2/4  Building the plugin"
 
 mkdir -p "$SERVICE_DIR/Plugins"
+
+# Noted before the build, because the build itself asks the service to reload: what the log says
+# about this install is everything written after this point.
+LOG_BEFORE="$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')"; LOG_BEFORE="${LOG_BEFORE:-0}"
+HELPER="$HERE/plugin/bin/Release/bin/deck-apps watch"
+BEFORE="$(pgrep -f "$HELPER" | sort | tr '\n' ' ')"
 PREVIOUS="$(cat "$LINK" 2>/dev/null | tr -d '\r\n')"
 
 if ! dotnet build "$PROJECT" -c Release -nologo -v q > "$HERE/plugin/build.log" 2>&1; then
@@ -111,8 +117,6 @@ ok "config at ~/.claude/deck/config.json"
 echo; bold "4/4  Loading the plugin"
 
 CURRENT="$(cat "$LINK" 2>/dev/null | tr -d '\r\n')"
-HELPER="$HERE/plugin/bin/Release/bin/deck-apps watch"
-BEFORE="$(pgrep -f "$HELPER" | sort | tr '\n' ' ')"
 if ! pgrep -x LogiPluginService >/dev/null; then
   open "$SERVICE_APP"; ok "started Logi Plugin Service"
 elif [ -n "$PREVIOUS" ] && [ "$PREVIOUS" != "$CURRENT" ]; then
@@ -123,22 +127,41 @@ else
   open "loupedeck:plugin/ClaudeDeck/reload" 2>/dev/null; ok "asked the service to reload the plugin"
 fi
 
-# The helper is started by the plugin's own Load(), so a helper running from THIS folder is proof the
-# service loaded THIS build - provided it is a new process. One left over from before the reload
-# proves nothing, so its pid has to have changed.
-LOADED=0
+# Two independent witnesses, because each can mislead on its own.
+#   The service's log for this plugin says whether it ACCEPTED the build: "loaded from" on success,
+#   "Cannot load plugin from '<…>.dll'" on refusal. (The similar "…because plugin is already loaded"
+#   is harmless - the service scans its plugin folder twice.)
+#   A helper process running from THIS folder, with a pid it did not have before, says the plugin's
+#   Load() really ran here. It is not enough alone: the service runs Load() before it decides, so a
+#   refused plugin starts a helper too.
+new_log_lines() {
+  SIZE="$(wc -c < "$LOG" 2>/dev/null | tr -d ' ')"
+  if [ "${SIZE:-0}" -lt "${LOG_BEFORE:-0}" ]; then cat "$LOG" 2>/dev/null        # the log was rotated
+  else tail -c "+$((LOG_BEFORE + 1))" "$LOG" 2>/dev/null; fi
+}
+
+VERDICT=unknown
 for _ in $(seq 1 30); do
+  LINES="$(new_log_lines)"
+  if printf '%s' "$LINES" | grep -q "Cannot load plugin from .*\.dll'"; then VERDICT=refused; break; fi
   NOW="$(pgrep -f "$HELPER" | sort | tr '\n' ' ')"
-  if [ -n "$NOW" ] && [ "$NOW" != "$BEFORE" ]; then LOADED=1; break; fi
+  if printf '%s' "$LINES" | grep -q "loaded from" && [ -n "$NOW" ] && [ "$NOW" != "$BEFORE" ]; then VERDICT=loaded; break; fi
   sleep 1
 done
 
-if [ "$LOADED" -eq 1 ]; then
-  ok "plugin is loaded and running"
-else
-  warn "could not confirm the plugin loaded. Quit and reopen $SERVICE_APP, then check:"
-  warn "  $LOG"
-fi
+case "$VERDICT" in
+  loaded)
+    ok "plugin is loaded and running" ;;
+  refused)
+    bad "Logi Plugin Service REFUSED the plugin. Its log says:"
+    new_log_lines | grep -E "ERROR|WARN" | tail -4 | sed 's/^/      /'
+    warn "after fixing the cause, restart the service - a refused plugin stays disabled until then:"
+    warn "  quit and reopen $SERVICE_APP"
+    exit 1 ;;
+  *)
+    warn "could not confirm the plugin loaded. Quit and reopen $SERVICE_APP, then check:"
+    warn "  $LOG" ;;
+esac
 
 cat <<EOF
 

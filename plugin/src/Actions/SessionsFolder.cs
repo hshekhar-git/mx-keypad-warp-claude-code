@@ -22,7 +22,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     // aligned with the host's paging.
     public class SessionsFolder : PluginDynamicFolder
     {
-        private const Int32 TilesPerPage = 8;
+        private const Int32 KeysPerPage = 8;
         private const Int32 FlashFrames = 2;
         private const String Notice = "notice";
 
@@ -61,21 +61,8 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private List<SessionInfo> Others => Store.All.Where(s => s.Key != this._page).ToList();
 
-        // Who most deserves you next: blocked longest, else errored, else finished longest ago.
-        private SessionInfo Neediest()
-        {
-            var others = this.Others;
-            foreach (var state in new[] { "attention", "error", "done" })
-            {
-                var hit = others.Where(s => s.State == state).OrderBy(s => s.Since).FirstOrDefault();
-                if (hit != null)
-                {
-                    return hit;
-                }
-            }
-
-            return null;
-        }
+        // Whoever, other than the session on the page, most deserves you next.
+        private SessionInfo Neediest() => Urgency.Queue().FirstOrDefault(s => s.Key != this._page);
 
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
             PluginDynamicFolderNavigation.ButtonArea;
@@ -94,7 +81,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             DeckConfig.Changed += this.OnLayoutChanged;
             Deck.TargetChanged += this.OnRepaint;
             AppWatcher.Instance.Changed += this.OnRepaint;
-            this._tick.Change(TileRenderer.TickMs, TileRenderer.TickMs);
+            this._tick.Change(TileRenderer.FrameMs, TileRenderer.FrameMs);
             return base.Activate();
         }
 
@@ -117,7 +104,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static List<String> BuildList()
         {
             var usage = DeckConfig.UsageRow;
-            var perPage = usage ? TilesPerPage - 3 : TilesPerPage;
+            var perPage = usage ? KeysPerPage - 3 : KeysPerPage;
 
             // Each chunk is one keypad page: a run of sessions that belong together.
             var chunks = new List<(String Id, List<SessionInfo> Sessions)>();
@@ -175,7 +162,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             return list;
         }
 
-        private IReadOnlyList<AnswerKey> PageAnswers() => Deck.AnswersFor(this.Page, TilesPerPage - 2);
+        private IReadOnlyList<AnswerKey> PageAnswers() => Deck.AnswersFor(this.Page, KeysPerPage - 2);
 
         private List<String> BuildPage()
         {
@@ -486,7 +473,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             if (actionParameter == null)
             {
-                return TileRenderer.Blank(imageSize);
+                return TileRenderer.Dark(imageSize);
             }
 
             var flash = this._flash == actionParameter;
@@ -496,7 +483,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 var s = Store.Find(actionParameter.Substring(2));
                 return s != null
                     ? TileRenderer.Session(s, Deck.Target?.Key == s.Key, flash, imageSize, this._frame)
-                    : TileRenderer.Blank(imageSize);
+                    : TileRenderer.Dark(imageSize);
             }
 
             if (actionParameter.StartsWith("u:", StringComparison.Ordinal))
@@ -506,14 +493,14 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             if (actionParameter == Notice)
             {
-                return HookStatus.IsWired
+                return HookStatus.Installed
                     ? TileRenderer.Message("No sessions", "start claude in a terminal", imageSize)
                     : TileRenderer.Message("Not set up", "run ./install.sh", imageSize);
             }
 
             if (!actionParameter.StartsWith("p:", StringComparison.Ordinal))
             {
-                return TileRenderer.Blank(imageSize);
+                return TileRenderer.Dark(imageSize);
             }
 
             var page = this.Page;
@@ -524,7 +511,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             if (page == null)
             {
-                return TileRenderer.Blank(imageSize);
+                return TileRenderer.Dark(imageSize);
             }
 
             switch (actionParameter)
@@ -548,7 +535,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 var answers = this.PageAnswers();
                 return a < answers.Count
                     ? TileRenderer.Command(answers[a].Label, answers[a].Color, flash, imageSize)
-                    : TileRenderer.Blank(imageSize);
+                    : TileRenderer.Dark(imageSize);
             }
 
             if (Index(actionParameter, "p:k:") is { } k && k < DeckConfig.Keys.Count)
@@ -556,7 +543,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return TileRenderer.Command(DeckConfig.Keys[k].Label, DeckConfig.Keys[k].Color, flash, imageSize);
             }
 
-            return TileRenderer.Blank(imageSize);
+            return TileRenderer.Dark(imageSize);
         }
 
         public override String GetCommandDisplayName(String actionParameter, PluginImageSize imageSize) => "";

@@ -2,83 +2,82 @@ namespace Loupedeck.ClaudeDeckPlugin
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
+    using System.Security.Cryptography;
     using System.Text;
 
-    // Publishes every key in config.json as a draggable action under "Commands", so /compact can sit
-    // on a home-page key. These never bring a terminal forward - they type only when one is already
-    // in front - so a mistimed press cannot land anywhere else.
+    // Puts every key from config.json into Options+ (under "Commands") so it can also sit on the
+    // main page. A key placed there only ever types into a terminal that is already in front; it
+    // does not bring one forward, because on the main page you may be looking at anything.
+    //
+    // What Options+ remembers about a placed key is its parameter name, so that name has to mean
+    // "this key" for as long as the key does. It is the key's "id" from the config when it has one;
+    // otherwise it is derived from what the key DOES - the text it types, whether it submits, the
+    // special key it sends. Relabelling or reordering keys therefore changes nothing, and two keys
+    // that do the same thing are, reasonably, the same key.
     public class ConfiguredKeyCommand : PluginDynamicCommand
     {
-        private EventHandler _onConfigChanged;
-        private volatile IReadOnlyDictionary<String, KeyDef> _published = new Dictionary<String, KeyDef>();
+        private volatile IReadOnlyDictionary<String, KeyDef> _keys = new Dictionary<String, KeyDef>();
 
         public ConfiguredKeyCommand()
-            : base((DeviceType)DeviceTypeAliases.MxCreativeKeypad)
-        {
-            this.IsWidget = true;
-        }
+            : base((DeviceType)DeviceTypeAliases.MxCreativeKeypad) => this.IsWidget = true;
 
         protected override Boolean OnLoad()
         {
-            this._onConfigChanged = (_, _) => this.Publish();
-            DeckConfig.Changed += this._onConfigChanged;
-            this.Publish();
+            DeckConfig.Changed += this.OnConfigChanged;
+            this.Republish();
             return true;
         }
 
         protected override Boolean OnUnload()
         {
-            DeckConfig.Changed -= this._onConfigChanged;
+            DeckConfig.Changed -= this.OnConfigChanged;
             return true;
         }
 
-        // Named after the label rather than the position, so reordering the file cannot silently
-        // re-point a key you have already placed.
-        private void Publish()
+        private void OnConfigChanged(Object sender, EventArgs e) => this.Republish();
+
+        private static String Identity(KeyDef key)
         {
-            var map = new Dictionary<String, KeyDef>(StringComparer.Ordinal);
-            this.RemoveAllParameters();
+            if (key.Id.Length > 0)
+            {
+                return "id-" + new String(key.Id.Where(c => Char.IsLetterOrDigit(c) || c is '-' or '_').ToArray());
+            }
+
+            var does = $"{key.Key.ToLowerInvariant()}\n{key.Text}\n{key.Submit}";
+            var digest = SHA256.HashData(Encoding.UTF8.GetBytes(does));
+            return "key-" + Convert.ToHexString(digest, 0, 6).ToLowerInvariant();
+        }
+
+        private void Republish()
+        {
+            var keys = new Dictionary<String, KeyDef>(StringComparer.Ordinal);
             foreach (var key in DeckConfig.Keys)
             {
-                var name = Slug(key.Label);
-                for (var n = 2; map.ContainsKey(name); n++)
-                {
-                    name = $"{Slug(key.Label)}-{n}";
-                }
+                keys.TryAdd(Identity(key), key);
+            }
 
-                map[name] = key;
+            this.RemoveAllParameters();
+            foreach (var (name, key) in keys)
+            {
                 this.AddParameter(name, key.Label, "Commands");
             }
 
-            this._published = map;
+            this._keys = keys;
             this.ParametersChanged();
         }
 
-        protected override void RunCommand(String actionParameter)
-        {
-            if (actionParameter != null && this._published.TryGetValue(actionParameter, out var key))
-            {
-                Deck.Send(key, bringForward: false);
-            }
-        }
+        private KeyDef Find(String actionParameter) =>
+            actionParameter != null && this._keys.TryGetValue(actionParameter, out var key) ? key : null;
 
-        protected override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize) =>
-            actionParameter != null && this._published.TryGetValue(actionParameter, out var key)
-                ? TileRenderer.Command(key.Label, key.Color, false, imageSize)
-                : TileRenderer.Blank(imageSize);
+        protected override void RunCommand(String actionParameter) => Deck.Send(this.Find(actionParameter), bringForward: false);
+
+        protected override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)
+        {
+            var key = this.Find(actionParameter);
+            return key == null ? TileRenderer.Dark(imageSize) : TileRenderer.Command(key.Label, key.Color, false, imageSize);
+        }
 
         protected override String GetCommandDisplayName(String actionParameter, PluginImageSize imageSize) => "";
-
-        private static String Slug(String label)
-        {
-            var sb = new StringBuilder();
-            foreach (var c in label ?? "")
-            {
-                sb.Append(Char.IsLetterOrDigit(c) ? Char.ToLowerInvariant(c) : '-');
-            }
-
-            var slug = sb.ToString().Trim('-');
-            return slug.Length == 0 ? "key" : slug;
-        }
     }
 }

@@ -8,15 +8,15 @@ namespace Loupedeck.ClaudeDeckPlugin
     public static class HookStatus
     {
         private static DateTime _checkedAt = DateTime.MinValue;
-        private static Boolean _wired;
+        private static Boolean _installed;
 
-        public static Boolean IsWired
+        public static Boolean Installed
         {
             get
             {
                 if (DateTime.UtcNow - _checkedAt < TimeSpan.FromSeconds(5))
                 {
-                    return _wired;
+                    return _installed;
                 }
 
                 _checkedAt = DateTime.UtcNow;
@@ -24,14 +24,14 @@ namespace Loupedeck.ClaudeDeckPlugin
                 {
                     var path = Path.Combine(
                         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "settings.json");
-                    _wired = File.Exists(path) && File.ReadAllText(path).Contains("deck-hook.sh", StringComparison.Ordinal);
+                    _installed = File.Exists(path) && File.ReadAllText(path).Contains("deck-hook.sh", StringComparison.Ordinal);
                 }
                 catch
                 {
-                    _wired = false;
+                    _installed = false;
                 }
 
-                return _wired;
+                return _installed;
             }
         }
     }

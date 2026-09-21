@@ -118,7 +118,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             var model = Lookup(actionParameter);
             return model == null
-                ? TileRenderer.Blank(imageSize)
+                ? TileRenderer.Dark(imageSize)
                 : TileRenderer.ModelChoice(model, session != null && model.Is(session.Selected), this._flash == actionParameter, imageSize);
         }
 

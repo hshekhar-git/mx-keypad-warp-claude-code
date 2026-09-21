@@ -1,106 +1,128 @@
 namespace Loupedeck.ClaudeDeckPlugin
 {
     using System;
+    using System.Collections.Generic;
+    using System.IO;
     using System.Threading.Tasks;
 
+    // The plugin itself: it owns the lifetime of the background pieces (config, sessions, usage, the
+    // app watcher) and turns session state changes into haptic events. Everything a key does lives in
+    // the Actions folder.
     public class ClaudeDeckPlugin : Plugin
     {
-        // Haptic events. The names must match package/events/*.yaml exactly.
-        private const String EventAttention = "needsAttention";
-        private const String EventDone = "turnDone";
-        private const String EventError = "sessionError";
-
-        public override Boolean UsesApplicationApiOnly => true;
-
-        // A status deck is for watching sessions while working somewhere else, so it must not be
-        // tied to an application profile that switches away when the terminal loses focus.
-        public override Boolean HasNoApplication => true;
+        // name -> (title, description). The names are repeated in package/events/*.yaml, which is
+        // where Options+ learns which haptic waveform each one plays.
+        private static readonly Dictionary<String, (String Title, String About)> Haptics = new()
+        {
+            ["needsAttention"] = ("Claude needs you", "A Claude Code session is blocked on a permission prompt, a question or a plan"),
+            ["turnDone"] = ("Claude finished", "A Claude Code session finished a long turn"),
+            ["sessionError"] = ("Claude errored", "A Claude Code session stopped on an error"),
+        };
 
         public ClaudeDeckPlugin() => PluginLog.Init(this.Log);
 
+        // The keypad shows these keys whatever app is in front, so the plugin is attached to none.
+        public override Boolean HasNoApplication => true;
+
+        public override Boolean UsesApplicationApiOnly => true;
+
         public override void Load()
         {
-            this.PluginEvents.AddEvent(EventAttention, "Claude needs you", "A Claude Code session is blocked on a permission prompt, a question or a plan");
-            this.PluginEvents.AddEvent(EventDone, "Claude finished", "A Claude Code session finished a long turn");
-            this.PluginEvents.AddEvent(EventError, "Claude errored", "A Claude Code session stopped on an error");
+            foreach (var (name, (title, about)) in Haptics)
+            {
+                this.PluginEvents.AddEvent(name, title, about);
+            }
 
-            TermInput.AccessibilityDenied += (_, _) => this.OnPluginStatusChanged(
-                Loupedeck.PluginStatus.Error,
-                "macOS blocked the keystroke. Grant Logi Plugin Service access under System Settings > "
-                + "Privacy & Security > Accessibility, then press the key again.",
-                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-                "Open Accessibility settings");
+            TermInput.AccessibilityDenied += this.OnAccessibilityDenied;
 
+            // Cheap and needed by the first key that draws: done here.
             DeckConfig.Start();
             UsageStore.Start();
-            SessionStatus.Sweep();
-
-            AppWatcher.HelperDir = System.IO.Path.GetDirectoryName(this.AssemblyFilePath);
+            AppWatcher.HelperDir = Path.GetDirectoryName(this.AssemblyFilePath);
             AppWatcher.Instance.EnsureStarted();
 
-            // Load has a 10 second budget and the host drops a plugin that overruns it, so the store -
-            // which shells out to sqlite3 and reads transcripts - is warmed off this thread.
-            Task.Run(() =>
-            {
-                try
-                {
-                    var store = SessionStore.Instance;
-                    store.Transition += this.OnTransition;
-
-                    // Which pane is "here" depends on which app is in front, so a change of app is
-                    // worth an immediate look rather than waiting for the next poll.
-                    AppWatcher.Instance.Changed += (_, _) => store.Poke();
-                    PluginLog.Info($"session store ready: {store.All.Count} session(s), hooks {(HookStatus.IsWired ? "wired" : "NOT wired")}");
-                }
-                catch (Exception ex)
-                {
-                    PluginLog.Error(ex, "Could not start the session store");
-                }
-            });
+            // Not cheap - reading session files, querying Warp's database, tailing transcripts - and
+            // the host unloads a plugin whose Load() takes too long. So the rest happens behind it.
+            Task.Run(this.StartSessions);
         }
 
+        private void StartSessions()
+        {
+            try
+            {
+                var sessions = SessionStore.Instance;
+                sessions.Transition += this.OnTransition;
+
+                // "Which pane am I in" depends on which app is in front; look again when that changes.
+                AppWatcher.Instance.Changed += (_, _) => sessions.Poke();
+                SessionStatus.Sweep();
+
+                PluginLog.Info($"watching {sessions.All.Count} session(s); hooks are {(HookStatus.Installed ? "installed" : "NOT installed - run ./install.sh")}");
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error(ex, "the session store did not start");
+            }
+        }
+
+        // The host reloads a plugin into the same process, and static state survives that. Anything
+        // with a timer, a watcher or a child process has to be stopped here or it runs twice.
         public override void Unload()
         {
-            // Statics live per load context, not per process: without this every reload would leave
-            // its predecessor's timers and file watcher running.
-            DeckConfig.Shutdown();
-            UsageStore.Shutdown();
+            TermInput.AccessibilityDenied -= this.OnAccessibilityDenied;
             TermInput.Shutdown();
             Deck.Shutdown();
             AppWatcher.Shutdown();
             SessionStore.Shutdown();
+            UsageStore.Shutdown();
+            DeckConfig.Shutdown();
         }
 
-        // Turns state changes into haptic events, which Options+ maps to a buzz on an MX Master 4.
-        private void OnTransition(Object sender, TransitionEventArgs e)
+        private void OnAccessibilityDenied(Object sender, EventArgs e) =>
+            this.OnPluginStatusChanged(
+                Loupedeck.PluginStatus.Error,
+                "A keystroke was blocked by macOS. Allow \"Logi Plugin Service\" under System Settings > Privacy & Security > Accessibility, then press the key again.",
+                "https://github.com/hshekhar-git/mx-keypad-warp-claude-code#step-4--allow-typing",
+                "Show me how");
+
+        // Which haptic event, if any, a change of state deserves.
+        private static String HapticFor(TransitionEventArgs change)
+        {
+            var session = change.Session;
+            switch (session.State)
+            {
+                case "attention":
+                    return DeckConfig.HapticAttention ? "needsAttention" : null;
+
+                case "error":
+                    return DeckConfig.HapticError ? "sessionError" : null;
+
+                case "done":
+                    // Only a turn that ran long enough for you to have looked away is worth a buzz.
+                    var ran = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - session.TurnSince;
+                    var wasRunning = change.From is "busy" or "attention";
+                    return DeckConfig.HapticDone && wasRunning && session.TurnSince > 0 && ran >= DeckConfig.HapticMinTurnSeconds
+                        ? "turnDone"
+                        : null;
+
+                default:
+                    return null;
+            }
+        }
+
+        private void OnTransition(Object sender, TransitionEventArgs change)
         {
             try
             {
-                var s = e.Session;
-                switch (s.State)
+                var haptic = HapticFor(change);
+                if (haptic != null)
                 {
-                    case "attention" when DeckConfig.HapticAttention:
-                        this.PluginEvents.RaiseEvent(EventAttention);
-                        break;
-
-                    case "error" when DeckConfig.HapticError:
-                        this.PluginEvents.RaiseEvent(EventError);
-                        break;
-
-                    // A turn you are still watching finish does not need announcing.
-                    case "done" when DeckConfig.HapticDone && e.From is "busy" or "attention":
-                        var took = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - s.TurnSince;
-                        if (s.TurnSince > 0 && took >= DeckConfig.HapticMinTurnSeconds)
-                        {
-                            this.PluginEvents.RaiseEvent(EventDone);
-                        }
-
-                        break;
+                    this.PluginEvents.RaiseEvent(haptic);
                 }
             }
             catch (Exception ex)
             {
-                PluginLog.Warning($"haptic event failed: {ex.Message}");
+                PluginLog.Warning($"haptic event not raised: {ex.Message}");
             }
         }
     }

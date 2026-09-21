@@ -8,7 +8,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     {
         private readonly SettingStepper _stepper;
         private EventHandler _onChanged;
-        private String _signature = "";
+        private String _drawn = "";
 
         protected SettingKeyCommand(String displayName, String description, SessionSetting setting)
             : base(displayName, description, "Claude", (DeviceType)DeviceTypeAliases.MxCreativeKeypad)
@@ -32,9 +32,9 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             var s = Deck.ModelTarget;
             var signature = s == null ? "" : $"{s.Key}|{s.Project}|{s.State}|{this._stepper.Setting.CurrentText(s)}|{this._stepper.Setting.Hint(s)}";
-            if (signature != this._signature)
+            if (signature != this._drawn)
             {
-                this._signature = signature;
+                this._drawn = signature;
                 this.ActionImageChanged();
             }
         }

@@ -2,14 +2,19 @@ namespace Loupedeck.ClaudeDeckPlugin
 {
     using System;
 
-    // The GUI-configured twin of a config.json key: text, a Return checkbox and a label, set in the
-    // Options+ form. Drop it on as many keys as you like.
+    // A command key configured in Options+ rather than in config.json: drop it on a key, fill in the
+    // form. Any number of them can be placed, each with its own text.
+    //
+    // The form's field names are part of what Options+ stores for a placed key, so they are fixed.
     public class SendToClaudeCommand : ActionEditorCommand
     {
-        private const String TextName = "text";
-        private const String SubmitName = "submit";
-        private const String LabelName = "label";
-        private const String ForwardName = "forward";
+        private static class Field
+        {
+            public const String Text = "text";
+            public const String Submit = "submit";
+            public const String Forward = "forward";
+            public const String Label = "label";
+        }
 
         public SendToClaudeCommand()
             : base((DeviceType)DeviceTypeAliases.MxCreativeKeypad)
@@ -19,37 +24,37 @@ namespace Loupedeck.ClaudeDeckPlugin
             this.GroupName = "Claude";
             this.IsWidget = true;
 
-            this.ActionEditor.AddControlEx(new ActionEditorTextbox(
-                TextName, "Text", "Typed as written. Leave empty and tick Return for a bare Enter, which accepts a plan or a question."));
-            this.ActionEditor.AddControlEx(new ActionEditorCheckbox(
-                SubmitName, "Press Return", "Submit straight away. Leave off for commands you add to, such as /compact."));
-            this.ActionEditor.AddControlEx(new ActionEditorCheckbox(
-                ForwardName, "Bring the selected session forward", "If no terminal is in front, focus the session last selected on the keypad first."));
-            this.ActionEditor.AddControlEx(new ActionEditorTextbox(
-                LabelName, "Key label", "What the key shows. Defaults to the text."));
+            var form = this.ActionEditor;
+            form.AddControlEx(new ActionEditorTextbox(Field.Text, "Text",
+                "What to type, exactly as written. Empty, with Return ticked, is a bare Enter - which accepts a plan or a question's highlighted answer."));
+            form.AddControlEx(new ActionEditorCheckbox(Field.Submit, "Press Return",
+                "Send it straight away. Leave this off for something you finish by hand, like \"/compact \" followed by your own instructions."));
+            form.AddControlEx(new ActionEditorCheckbox(Field.Forward, "Bring the target session forward",
+                "With no terminal in front, go to the session the keypad is aimed at first. Off: the key does nothing unless a terminal is already in front."));
+            form.AddControlEx(new ActionEditorTextbox(Field.Label, "Key label", "Shown on the key. Defaults to the text."));
+        }
+
+        private static KeyDef Read(ActionEditorActionParameters form)
+        {
+            var text = form.GetString(Field.Text, "");
+            var label = form.GetString(Field.Label, "").Trim();
+            return new KeyDef
+            {
+                Text = text,
+                Submit = form.GetBoolean(Field.Submit, false),
+                Label = label.Length > 0 ? label : text.Trim().Length > 0 ? text.Trim() : "send",
+            };
         }
 
         protected override Boolean RunCommand(ActionEditorActionParameters actionParameters)
         {
-            var key = new KeyDef
-            {
-                Text = actionParameters.GetString(TextName, ""),
-                Submit = actionParameters.GetBoolean(SubmitName, false),
-            };
-            return (key.Text.Length > 0 || key.Submit)
-                && Deck.Send(key, actionParameters.GetBoolean(ForwardName, false));
+            var key = Read(actionParameters);
+            var anythingToSend = key.Text.Length > 0 || key.Submit;
+            return anythingToSend && Deck.Send(key, actionParameters.GetBoolean(Field.Forward, false));
         }
 
-        protected override BitmapImage GetCommandImage(ActionEditorActionParameters actionParameters, Int32 imageWidth, Int32 imageHeight)
-        {
-            var label = actionParameters.GetString(LabelName, "");
-            if (label.Length == 0)
-            {
-                label = actionParameters.GetString(TextName, "").Trim();
-            }
-
-            return TileRenderer.Command(label.Length > 0 ? label : "send", null, imageWidth, imageHeight);
-        }
+        protected override BitmapImage GetCommandImage(ActionEditorActionParameters actionParameters, Int32 imageWidth, Int32 imageHeight) =>
+            TileRenderer.Command(Read(actionParameters).Label, null, imageWidth, imageHeight);
 
         protected override String GetCommandDisplayName(ActionEditorActionParameters actionParameters) => "";
     }

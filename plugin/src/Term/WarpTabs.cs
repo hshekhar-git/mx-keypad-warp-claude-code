@@ -3,49 +3,68 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.Json;
 
     public sealed class PaneLocation
     {
         public Int32 WindowId { get; init; }
         public Int32 TabId { get; init; }
         public String TabTitle { get; init; } = "";
+
+        // Position of the pane among its tab's panes, for a stable order of tiles.
         public Int32 Ordinal { get; init; }
 
-        // The pane with keyboard focus, in the tab that is showing, of its window.
+        // Whether this is the pane with the keyboard: the focused leaf of the window's showing tab.
         public Boolean Focused { get; init; }
     }
 
-    // Warp keeps its window/tab/pane tree in SQLite. Read-only, through /usr/bin/sqlite3, and only to
-    // decide which keypad page a session belongs on: if the schema ever changes the query fails, the
-    // result is empty, and every Warp session simply lands on one page.
+    // Where each Warp pane sits. Warp persists its layout as a small SQLite database:
+    //
+    //   windows(id, active_tab_index)          tabs(id, window_id, custom_title)
+    //   pane_nodes(id, tab_id, is_leaf)        pane_leaves(pane_node_id, is_focused)
+    //   terminal_panes(id -> pane_nodes.id, uuid BLOB)
+    //
+    // The uuid is the same value a pane exports as WARP_TERMINAL_SESSION_UUID, which is what ties a
+    // Claude session to a row here. The database is somebody else's private format, so it is only
+    // ever opened read-only, and any failure - missing file, renamed column, locked database - just
+    // means no locations: sessions then group by app instead of by tab and everything else carries on.
     public static class WarpTabs
     {
-        private static readonly String[] Channels = { "dev.warp.Warp-Stable", "dev.warp.Warp-Preview" };
-
-        private const String Query =
-            "SELECT lower(hex(tp.uuid)), w.id, t.id, COALESCE(t.custom_title,''), " +
-            // tabs has no position column; rows are rewritten in display order, so rank by id.
-            "(pl.is_focused AND w.active_tab_index = " +
-            "(SELECT COUNT(*) FROM tabs t2 WHERE t2.window_id = w.id AND t2.id < t.id)) " +
-            "FROM terminal_panes tp " +
-            "JOIN pane_leaves pl ON pl.pane_node_id = tp.id " +
-            "JOIN pane_nodes  pn ON pn.id = tp.id " +
-            "JOIN tabs        t  ON t.id  = pn.tab_id " +
-            "JOIN windows     w  ON w.id  = t.window_id " +
-            "ORDER BY w.id, t.id, tp.id;";
+        // tabs carries no position, but Warp writes them in display order, so a tab's rank by id
+        // within its window is its index - the thing windows.active_tab_index refers to.
+        private const String Sql = @"
+WITH ranked_tabs AS (
+    SELECT id, window_id, custom_title,
+           ROW_NUMBER() OVER (PARTITION BY window_id ORDER BY id) - 1 AS tab_index
+    FROM tabs
+)
+SELECT lower(hex(p.uuid))                                          AS pane,
+       t.window_id                                                 AS win,
+       t.id                                                        AS tab,
+       IFNULL(t.custom_title, '')                                  AS title,
+       ROW_NUMBER() OVER (PARTITION BY t.id ORDER BY n.id) - 1     AS ordinal,
+       (l.is_focused = 1 AND w.active_tab_index = t.tab_index)     AS focused
+FROM ranked_tabs t
+JOIN windows        w ON w.id = t.window_id
+JOIN pane_nodes     n ON n.tab_id = t.id AND n.is_leaf = 1
+JOIN pane_leaves    l ON l.pane_node_id = n.id
+JOIN terminal_panes p ON p.id = n.id;";
 
         public static String DatabasePath
         {
             get
             {
-                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                foreach (var channel in Channels)
+                var support = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Library", "Group Containers", "2BBY89MBSN.dev.warp", "Library", "Application Support");
+
+                // Stable first, then Preview; whichever exists.
+                foreach (var channel in new[] { "dev.warp.Warp-Stable", "dev.warp.Warp-Preview" })
                 {
-                    var path = Path.Combine(
-                        home, "Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support", channel, "warp.sqlite");
-                    if (File.Exists(path))
+                    var candidate = Path.Combine(support, channel, "warp.sqlite");
+                    if (File.Exists(candidate))
                     {
-                        return path;
+                        return candidate;
                     }
                 }
 
@@ -55,51 +74,49 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public static Dictionary<String, PaneLocation> Read()
         {
-            var result = new Dictionary<String, PaneLocation>(StringComparer.Ordinal);
-            var db = DatabasePath;
-            if (db == null)
+            var panes = new Dictionary<String, PaneLocation>(StringComparer.Ordinal);
+            var database = DatabasePath;
+            if (database == null)
             {
-                return result;
+                return panes;
             }
 
-            var run = Shell.Run("/usr/bin/sqlite3", 2000, "-readonly", "-noheader", "-separator", "\u001f", db, Query);
-            if (!run.Ok)
+            var run = Shell.Run("/usr/bin/sqlite3", 2000, "-readonly", "-json", database, Sql);
+            if (!run.Ok || String.IsNullOrWhiteSpace(run.Output))
             {
-                return result;
+                return panes;
             }
 
-            var lastWindow = Int32.MinValue;
-            var lastTab = Int32.MinValue;
-            var ordinal = 0;
-            foreach (var line in run.Output.Split('\n'))
+            try
             {
-                var parts = line.Split('\u001f');
-                if (parts.Length < 5
-                    || parts[0].Length != 32
-                    || !Int32.TryParse(parts[1], out var windowId)
-                    || !Int32.TryParse(parts[2], out var tabId))
+                using var rows = JsonDocument.Parse(run.Output);
+                foreach (var row in rows.RootElement.EnumerateArray())
                 {
-                    continue;
+                    var pane = row.GetProperty("pane").GetString();
+                    if (String.IsNullOrEmpty(pane) || pane.Length != 32)
+                    {
+                        continue;
+                    }
+
+                    panes[pane] = new PaneLocation
+                    {
+                        WindowId = row.GetProperty("win").GetInt32(),
+                        TabId = row.GetProperty("tab").GetInt32(),
+                        TabTitle = row.GetProperty("title").GetString() ?? "",
+                        Ordinal = row.GetProperty("ordinal").GetInt32(),
+                        Focused = row.GetProperty("focused").ValueKind == JsonValueKind.Number
+                            && row.GetProperty("focused").GetInt32() == 1,
+                    };
                 }
-
-                if (windowId != lastWindow || tabId != lastTab)
-                {
-                    lastWindow = windowId;
-                    lastTab = tabId;
-                    ordinal = 0;
-                }
-
-                result[parts[0]] = new PaneLocation
-                {
-                    WindowId = windowId,
-                    TabId = tabId,
-                    TabTitle = parts[3].Trim('\r'),
-                    Ordinal = ordinal++,
-                    Focused = parts[4].Trim('\r') == "1",
-                };
+            }
+            catch (Exception ex)
+            {
+                // A layout this does not understand is the same as no layout.
+                PluginLog.Verbose($"Warp layout not understood: {ex.Message}");
+                panes.Clear();
             }
 
-            return result;
+            return panes;
         }
     }
 }

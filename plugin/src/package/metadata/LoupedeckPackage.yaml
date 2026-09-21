@@ -20,7 +20,7 @@ pluginCapabilities:
     - HasNoApplication
     - HasHapticMapping
 
-# 6.4 is the first Logi Plugin Service on the .NET 10 runtime.
+# The plugin is a .NET 10 assembly; Logi Plugin Service hosts that runtime from version 6.4.
 minimumLoupedeckVersion: 6.4
 
 license: MIT

@@ -56,7 +56,10 @@
   //   text    typed exactly as written (a trailing space is kept)
   //   submit  press Return afterwards
   //   key     "escape" interrupts instead of typing
-  //   color   "green" | "amber" | "red" | "coral" | "purple", default neutral
+  //   color   "green" | "amber" | "red" | "coral" | "purple" | "blue" | "violet", default neutral
+  //   id      optional name of your choosing. A key you have placed from "Commands" in Options+ is
+  //           remembered by its id, or without one by what it does - so relabelling never unbinds it,
+  //           and with an id you can even change what it types
   // The same keys are published under "Commands" in Options+ for your home page.
   "keys": [
     { "label": "esc",      "key": "escape" },

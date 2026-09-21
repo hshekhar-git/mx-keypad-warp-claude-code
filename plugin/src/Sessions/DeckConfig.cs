@@ -9,6 +9,10 @@ namespace Loupedeck.ClaudeDeckPlugin
 
     public sealed class KeyDef
     {
+        // Optional and yours to choose: a stable name for this key, so that Options+ keeps a placed
+        // copy of it bound even if you later change what it types.
+        public String Id { get; init; } = "";
+
         public String Label { get; init; } = "";
         public String Text { get; init; } = "";
         public Boolean Submit { get; init; }
@@ -19,7 +23,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         // Optional tile colour: "green", "amber", "red", or empty for neutral.
         public String Color { get; init; } = "";
 
-        public Boolean IsEscape => String.Equals(this.Key, "escape", StringComparison.OrdinalIgnoreCase);
+        // "key": "escape" (or "esc") sends the Escape key instead of typing anything.
+        public Boolean IsEscape => this.Key.Trim().ToLowerInvariant() is "escape" or "esc";
     }
 
     public sealed class ModelDef
@@ -44,7 +49,8 @@ namespace Loupedeck.ClaudeDeckPlugin
     // keeps the previous settings rather than resetting the deck mid-edit.
     public static class DeckConfig
     {
-        public const Int32 MaxKeys = 7;
+        // A session's page flows onto further pages, so this is a sanity limit rather than a layout one.
+        public const Int32 MaxKeys = 12;
 
         private static readonly Object Gate = new();
         private static Timer _poll;
@@ -355,7 +361,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                             lbl = text.Trim().Length > 0 ? text.Trim() : (key.Length > 0 ? key : "return");
                         }
 
-                        list.Add(new KeyDef { Label = lbl, Text = text, Key = key, Submit = submit, Color = Str(k, "color") });
+                        list.Add(new KeyDef { Id = Str(k, "id"), Label = lbl, Text = text, Key = key, Submit = submit, Color = Str(k, "color") });
                     }
 
                     s.Keys = list;

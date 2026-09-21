@@ -225,7 +225,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var app = Watcher.Find(actionParameter.Substring(2));
             if (app == null)
             {
-                return TileRenderer.Blank(imageSize);
+                return TileRenderer.Dark(imageSize);
             }
 
             var (state, count) = Apps.Badge(app.Bundle);

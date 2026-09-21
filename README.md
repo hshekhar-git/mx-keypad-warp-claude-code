@@ -362,7 +362,7 @@ actions work on every profile.
 |---|---|
 | The plugin is not in the Options+ action list | It did not load. Quit and reopen `/Applications/Utilities/LogiPluginService.app`, then look at `~/Library/Application Support/Logi/LogiPluginService/Logs/plugin_logs/ClaudeDeck.log` |
 | Log says `Cannot load plugin ... because plugin 'ClaudeDeck' is already loaded` | Harmless on its own - the service enumerates plugins twice and stock plugins log the same line. It only matters right after **moving the folder**: the old copy is still in memory. Run `./install.sh` again, or restart Logi Plugin Service |
-| Log says `Cannot load plugin from '<path>.dll'` | `PluginApi.dll` ended up in the build output. It must never ship; the project already sets `<Private>false</Private>`, so run `dotnet build ... -t:Clean` and build again |
+| Log says `Cannot load plugin from '<path>.dll'` | The service refused the assembly. Two known causes: a copy of `PluginApi.dll` in the plugin folder (the project references it with `Private="false"` so that cannot happen - `dotnet build ... -t:Clean` and rebuild), or an assembly with no `ClientApplication` type in it, which the service requires even of a plugin that follows no application (`Helpers/NoApplication.cs`). A refused plugin stays disabled until Logi Plugin Service is restarted |
 | `dotnet: command not found`, or *"You must install .NET"* | `brew install dotnet`, and build through `./install.sh` (or `source env.sh` first): Homebrew's dotnet needs `DOTNET_ROOT` set |
 | Build fails at `swiftc` | `xcode-select --install` |
 | Folder opens but shows **Not set up** | The hooks are not in `~/.claude/settings.json`. Run `hooks/install-hooks.sh` |
@@ -400,8 +400,12 @@ claude ─ hooks ─► deck-hook.sh ─ one jq call, atomic write ─► ~/.cla
                                                                   haptic events → MX Master 4
 ```
 
-State lives in files, not a socket: it survives plugin reloads, needs no port, and a hook that
-reaches nothing still exits 0. Sessions are reaped when their `claude` PID is gone.
+The hooks and the plugin never talk to each other directly: a hook writes a small JSON file and is
+done, and the plugin watches the folder. That is deliberate. A hook runs inside your Claude session,
+so it has to be fast and it has to be harmless - with no plugin running, a full disk or a missing
+`jq`, it still exits cleanly and the session never notices. And because the state is on disk, a
+plugin reload or an Options+ update picks up exactly where it left off. A session's file is removed
+when the session ends, or when its `claude` process is found to be gone.
 
 ## Developing
 

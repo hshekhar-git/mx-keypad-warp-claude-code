@@ -16,8 +16,9 @@
 # One file per session: ~/.claude/deck/sessions/<key>.json, written atomically. The key is the Warp
 # pane uuid when there is one (so `claude --resume` keeps its tile), else the Claude session id.
 #
-# Always exits 0 and never prints: a status display must not be able to break, slow down or answer
-# for the session it is watching.
+# This runs INSIDE your Claude session, on every tool call, so two rules come before everything else:
+# it must be quick, and it must be invisible. It exits 0 whatever happens, prints nothing, and never
+# returns a decision - it can watch a permission prompt, but it cannot answer one.
 
 set -u
 umask 077
@@ -59,32 +60,38 @@ if [ "$EVENT" = "end" ]; then
   exit 0
 fi
 
-# --- metadata, only when it can have changed --------------------------------------------------
-# A git call and a walk up the process tree are too much for the hot path (every tool call), so
-# they run on start, on each prompt, and whenever the file is missing - which is how a session
-# that predates the hook heals itself.
+# --- who and where ------------------------------------------------------------------------------
+# Looked up on the events that can change it (a new session, a new prompt) and whenever the session
+# has no file yet; every other event reuses what is on file, because tool calls fire constantly.
 PROJECT=""
 BRANCH=""
 PID=""
 if [ "$EVENT" = "start" ] || [ "$EVENT" = "prompt" ] || [ ! -r "$FILE" ]; then
-  CWD="$(printf '%s' "$PAYLOAD" | "$JQ" -r '.cwd // empty' 2>/dev/null)"
-  [ -n "$CWD" ] || CWD="$PWD"
-  TOP="$(git -C "$CWD" rev-parse --show-toplevel 2>/dev/null)"
-  if [ -n "$TOP" ]; then
-    PROJECT="$(basename "$TOP")"
-    BRANCH="$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null)"
-    [ "$BRANCH" = "HEAD" ] && BRANCH="$(git -C "$CWD" rev-parse --short HEAD 2>/dev/null)"
+  WHERE="$(printf '%s' "$PAYLOAD" | "$JQ" -r '.cwd // empty' 2>/dev/null)"
+  [ -d "$WHERE" ] || WHERE="$PWD"
+
+  # One git call answers both questions: line 1 is the work tree, line 2 the branch. A detached
+  # HEAD answers "HEAD" for the branch, which says nothing, so the short hash stands in for it.
+  GITINFO="$(git -C "$WHERE" rev-parse --show-toplevel --abbrev-ref HEAD 2>/dev/null)"
+  if [ -n "$GITINFO" ]; then
+    PROJECT="$(printf '%s\n' "$GITINFO" | sed -n 1p)"
+    PROJECT="${PROJECT##*/}"
+    BRANCH="$(printf '%s\n' "$GITINFO" | sed -n 2p)"
+    [ "$BRANCH" != "HEAD" ] || BRANCH="$(git -C "$WHERE" rev-parse --short HEAD 2>/dev/null)"
   fi
 
-  p=$$
-  n=0
-  while [ "$n" -lt 12 ]; do
-    c="$(ps -o comm= -p "$p" 2>/dev/null | sed 's|.*/||')"
-    if [ "$c" = "claude" ]; then PID="$p"; break; fi
-    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')"
-    { [ -z "$p" ] || [ "$p" -le 1 ]; } && break
-    n=$((n + 1))
-  done
+  # The claude process that owns this hook, so the plugin can tell when the session has died.
+  # The whole process table is read once and the ancestry followed inside awk: the nearest
+  # ancestor whose executable is called "claude" wins.
+  PID="$(ps -axo pid=,ppid=,comm= 2>/dev/null | awk -v me="$$" '
+    { parent[$1] = $2; name = $3; sub(/.*\//, "", name); exe[$1] = name }
+    END {
+      at = me
+      for (hops = 0; hops < 16 && at > 1; hops++) {
+        if (exe[at] == "claude") { print at; exit }
+        at = parent[at]
+      }
+    }')"
 fi
 
 OLD="$FILE"

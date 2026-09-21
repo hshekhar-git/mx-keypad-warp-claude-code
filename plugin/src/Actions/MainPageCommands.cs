@@ -16,15 +16,15 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
         }
 
-        protected override Boolean Blinks => InState("attention").Count > 0;
+        protected override Boolean Pulses => Urgency.Tiers()[0].Sessions.Count > 0;
 
-        protected override List<SessionInfo> Candidates() => MainPage.Queue();
+        protected override IReadOnlyList<SessionInfo> Walk() => Urgency.Queue();
 
-        protected override String Signature() =>
+        protected override String Fingerprint() =>
             String.Join("|", SessionStore.Instance.All.Select(s => $"{s.Key}:{s.State}:{s.IsLimited}")) + "#" + Deck.Target?.Key;
 
         protected override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize) =>
-            TileRenderer.Overview(SessionStore.Instance.All, Deck.Target?.Key, imageSize, this.Frame);
+            TileRenderer.Overview(SessionStore.Instance.All, Deck.Target?.Key, imageSize, this.Beat);
     }
 
     // The one session that most deserves you, as a full live tile: what it is, and what it wants.
@@ -36,22 +36,22 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
         }
 
-        protected override Boolean Blinks => InState("attention").Count > 0;
+        protected override Boolean Pulses => Urgency.Tiers()[0].Sessions.Count > 0;
 
-        protected override List<SessionInfo> Candidates() => MainPage.Queue();
+        protected override IReadOnlyList<SessionInfo> Walk() => Urgency.Queue();
 
-        protected override String Signature()
+        protected override String Fingerprint()
         {
-            var next = MainPage.Queue().FirstOrDefault();
+            var next = Urgency.Queue().FirstOrDefault();
             var all = SessionStore.Instance.All;
             return next == null
                 ? $"clear:{all.Count(s => s.State == "busy")}:{all.Count}"
-                : $"{next.Key}:{next.State}:{next.Kind}:{next.Detail}:{next.Question}:{next.Title}:{next.Limit}:{MainPage.Queue().Count}";
+                : $"{next.Key}:{next.State}:{next.Kind}:{next.Detail}:{next.Question}:{next.Title}:{next.Limit}:{Urgency.Queue().Count}";
         }
 
         protected override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)
         {
-            var queue = MainPage.Queue();
+            var queue = Urgency.Queue();
             if (queue.Count == 0)
             {
                 var all = SessionStore.Instance.All;
@@ -59,26 +59,11 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             var header = queue.Count > 1 ? $"NEXT · 1 of {queue.Count}" : "NEXT";
-            return TileRenderer.Session(queue[0], false, false, imageSize, this.Frame, header);
+            return TileRenderer.Session(queue[0], false, false, imageSize, this.Beat, header);
         }
 
         // Always the head of the queue, not a walk through it: dealing with it is what moves it on.
-        protected override void RunCommand(String actionParameter) => Deck.Focus(MainPage.Queue().FirstOrDefault());
-    }
-
-    public static class MainPage
-    {
-        // Who wants you, in the order to deal with them: blocked (longest first), errored, out of
-        // usage, finished (longest ago first). Sessions that are working or idle want nothing.
-        public static List<SessionInfo> Queue()
-        {
-            var all = SessionStore.Instance.All;
-            return all.Where(s => s.State == "attention").OrderBy(s => s.Since)
-                .Concat(all.Where(s => s.State == "error" && !s.IsLimited).OrderBy(s => s.Since))
-                .Concat(all.Where(s => s.IsLimited).OrderBy(s => s.Since))
-                .Concat(all.Where(s => s.State == "done" && !s.IsLimited).OrderBy(s => s.Since))
-                .ToList();
-        }
+        protected override void RunCommand(String actionParameter) => Deck.Focus(Urgency.Queue().FirstOrDefault());
     }
 
     // Session slots: the deck itself, on the main page. "Slot 3" is the third session, in the same
@@ -94,7 +79,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         private volatile Int32 _frame;
         private volatile String _held;
         private volatile String _flash;
-        private String _signature = "";
+        private String _drawn = "";
 
         public SessionSlotCommand()
             : base((DeviceType)DeviceTypeAliases.MxCreativeKeypad)
@@ -135,14 +120,14 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             // The sweep and the blink only run while something is actually moving.
             var moving = all.Take(Slots).Any(TileRenderer.Animates);
-            this._tick.Change(moving ? TileRenderer.TickMs : Timeout.Infinite, moving ? TileRenderer.TickMs : Timeout.Infinite);
+            this._tick.Change(moving ? TileRenderer.FrameMs : Timeout.Infinite, moving ? TileRenderer.FrameMs : Timeout.Infinite);
 
             var signature = String.Join("|", all.Take(Slots).Select(s =>
                 $"{s.Key}:{s.State}:{s.Kind}:{s.Tool}:{s.Detail}:{s.Title}:{s.Prompt}:{s.Limit}:{s.Selected.Short}:{(Int32)(s.ContextFill * 100)}"))
                 + "#" + Deck.Target?.Key;
-            if (signature != this._signature)
+            if (signature != this._drawn)
             {
-                this._signature = signature;
+                this._drawn = signature;
                 this.ActionImageChanged();
             }
         }

@@ -1,64 +1,68 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    Builds three things into ../bin/<Configuration>/, which is the shape Logi Plugin Service expects
+    of a plugin folder:
+
+        bin/ClaudeDeckPlugin.dll     this project
+        bin/deck-apps                the Swift app-watcher in ../../helper
+        metadata/, events/           copied from ./package
+
+    and then, unless NoPluginLink=true, tells the service where that folder is and asks it to reload.
+  -->
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <RootNamespace>Loupedeck.ClaudeDeckPlugin</RootNamespace>
     <AssemblyName>ClaudeDeckPlugin</AssemblyName>
-    <WarningLevel>4</WarningLevel>
+    <RootNamespace>Loupedeck.ClaudeDeckPlugin</RootNamespace>
 
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- The service loads the DLL by path; it wants no deps.json and no framework sub-folder. -->
     <GenerateDependencyFile>false</GenerateDependencyFile>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
-    <PluginApiDir>/Applications/Utilities/LogiPluginService.app/Contents/MonoBundle/</PluginApiDir>
-    <PluginDir>$(HOME)/Library/Application Support/Logi/LogiPluginService/Plugins/</PluginDir>
-
-    <BaseOutputPath>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\bin\'))</BaseOutputPath>
-    <OutputPath>$(BaseOutputPath)$(Configuration)\bin\</OutputPath>
-
-    <PluginShortName>ClaudeDeck</PluginShortName>
+    <PluginId>ClaudeDeck</PluginId>
+    <ServiceApp>/Applications/Utilities/LogiPluginService.app</ServiceApp>
+    <ServicePlugins>$(HOME)/Library/Application Support/Logi/LogiPluginService/Plugins</ServicePlugins>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))</RepoRoot>
+    <PluginFolder>$(RepoRoot)plugin/bin/$(Configuration)/</PluginFolder>
+    <OutputPath>$(PluginFolder)bin/</OutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
   </PropertyGroup>
 
-  <!-- PluginApi.dll must never be copied into the output: the service refuses to load a plugin
-       that ships its own copy. -->
+  <!-- Compiled against the service's own PluginApi.dll and never shipped with a copy of it: a
+       plugin folder that contains one is refused. -->
   <ItemGroup>
-    <Reference Include="PluginApi">
-      <HintPath>$(PluginApiDir)PluginApi.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <Reference Include="PluginApi" HintPath="$(ServiceApp)/Contents/MonoBundle/PluginApi.dll" Private="false" />
   </ItemGroup>
 
-  <!-- The native app watcher travels beside the DLL. Rebuilt only when its source changes. -->
-  <Target Name="BuildHelper" AfterTargets="PostBuildEvent"
-          Inputs="$(MSBuildThisFileDirectory)../../helper/deck-apps.swift" Outputs="$(OutputPath)deck-apps">
-    <Exec Command="/usr/bin/swiftc -O &quot;$(MSBuildThisFileDirectory)../../helper/deck-apps.swift&quot; -o &quot;$(OutputPath)deck-apps&quot;" />
+  <Target Name="DeckHelper" AfterTargets="Build"
+          Inputs="$(RepoRoot)helper/deck-apps.swift" Outputs="$(OutputPath)deck-apps">
+    <Exec Command="/usr/bin/swiftc -O &quot;$(RepoRoot)helper/deck-apps.swift&quot; -o &quot;$(OutputPath)deck-apps&quot;" />
   </Target>
 
-  <Target Name="CopyPackage" AfterTargets="BuildHelper">
+  <Target Name="DeckPackage" AfterTargets="DeckHelper">
     <ItemGroup>
-      <PackageFiles Include="package\**\*" />
+      <PackageFile Include="package/**/*" />
     </ItemGroup>
-    <Copy SourceFiles="@(PackageFiles)" DestinationFolder="$(OutputPath)..\%(RecursiveDir)" />
+    <Copy SourceFiles="@(PackageFile)" DestinationFiles="@(PackageFile->'$(PluginFolder)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Dev install: a .link file pointing the service at the build output, then a reload. -->
-  <Target Name="LinkAndReload" AfterTargets="CopyPackage" Condition="'$(NoPluginLink)' != 'true'">
-    <WriteLinesToFile File="$(PluginDir)$(MSBuildProjectName).link" Lines="$(BaseOutputPath)$(Configuration)/" Overwrite="true" />
-    <Message Text="Linked $(PluginDir)$(MSBuildProjectName).link" Importance="High" />
-    <Exec Command="open loupedeck:plugin/$(PluginShortName)/reload" ContinueOnError="true" />
+  <Target Name="DeckInstall" AfterTargets="DeckPackage" Condition="'$(NoPluginLink)' != 'true'">
+    <MakeDir Directories="$(ServicePlugins)" />
+    <WriteLinesToFile File="$(ServicePlugins)/$(AssemblyName).link" Lines="$(PluginFolder)" Overwrite="true" />
+    <Exec Command="open loupedeck:plugin/$(PluginId)/reload" ContinueOnError="true" StandardOutputImportance="low" />
+    <Message Importance="high" Text="$(PluginId) -> $(PluginFolder)" />
   </Target>
 
-  <Target Name="PluginClean" AfterTargets="CoreClean">
-    <Delete Files="$(PluginDir)$(MSBuildProjectName).link" />
-    <RemoveDir Directories="$(OutputPath)..\" />
+  <Target Name="DeckUninstall" AfterTargets="Clean">
+    <Delete Files="$(ServicePlugins)/$(AssemblyName).link" />
+    <RemoveDir Directories="$(PluginFolder)" />
   </Target>
 
 </Project>

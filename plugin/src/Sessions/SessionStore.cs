@@ -99,7 +99,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     // session that dies without a SessionEnd leaves a file only a liveness check can clear.
     public sealed class SessionStore : IDisposable
     {
-        private const Int32 DebounceMs = 120;
+        private const Int32 SettleMs = 120;
         private const Int32 PollMs = 2000;
         private const Int64 OrphanSeconds = 12 * 3600;
 
@@ -127,10 +127,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         }
 
         private readonly Object _gate = new();
-        private readonly FileSystemWatcher _watcher;
-        private readonly Timer _debounce;
-        private readonly Timer _poll;
-        private readonly Dictionary<String, PaneLocation> _lastSeen = new(StringComparer.Ordinal);
+        private readonly FolderWatch _watch;
+        private readonly Dictionary<String, (PaneLocation Where, DateTime SeenAt)> _placements = new(StringComparer.Ordinal);
         private Dictionary<String, PaneLocation> _locations = new(StringComparer.Ordinal);
         private DateTime _locationsReadAt = DateTime.MinValue;
 
@@ -147,37 +145,9 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private SessionStore()
         {
-            var dir = DeckConfig.SessionsDir;
-            try
-            {
-                Directory.CreateDirectory(dir);
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Warning($"Could not create {dir}: {ex.Message}");
-            }
-
-            this._debounce = new Timer(_ => this.Reload(), null, Timeout.Infinite, Timeout.Infinite);
-            this._poll = new Timer(_ => this.Reload(), null, PollMs, PollMs);
-
-            try
-            {
-                this._watcher = new FileSystemWatcher(dir, "*.json")
-                {
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
-                    IncludeSubdirectories = false,
-                };
-                this._watcher.Created += this.OnFileEvent;
-                this._watcher.Changed += this.OnFileEvent;
-                this._watcher.Deleted += this.OnFileEvent;
-                this._watcher.Renamed += this.OnFileEvent;
-                this._watcher.EnableRaisingEvents = true;
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Warning($"File watching unavailable, polling only: {ex.Message}");
-            }
-
+            // A burst of hook writes settles into one reload; the steady check is what notices a
+            // session whose process died without saying goodbye.
+            this._watch = new FolderWatch(DeckConfig.SessionsDir, "*.json", SettleMs, PollMs, this.Reload);
             this.Reload();
         }
 
@@ -207,23 +177,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         }
 
         // For callers that know something relevant just changed - the app in front, say.
-        public void Poke() => this.OnFileEvent(null, null);
-
-        private void OnFileEvent(Object sender, FileSystemEventArgs e)
-        {
-            if (this._disposed)
-            {
-                return;
-            }
-
-            try
-            {
-                this._debounce.Change(DebounceMs, Timeout.Infinite);
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-        }
+        public void Poke() => this._watch.Nudge();
 
         private void Reload()
         {
@@ -336,7 +290,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 }
                 catch (Exception)
                 {
-                    // Mid-rename or not ours; the next pass will see it whole.
+                    // Caught half-written, or not a session file at all. Either way: skip it this time.
                     continue;
                 }
 
@@ -362,39 +316,57 @@ namespace Loupedeck.ClaudeDeckPlugin
             return list;
         }
 
-        // Which Warp tab each pane is in. Warp persists its pane tree lazily, so a live pane can
-        // briefly vanish from the database when a neighbour closes; trusting that blink would shuffle
-        // every page, so a pane keeps the last place it was seen until the database says otherwise.
+        // Gives each Warp session its place in Warp's layout.
+        //
+        // The layout database is written by Warp on its own schedule, so for a second or two after a
+        // pane opens, closes or moves, a pane that certainly exists can be missing from it. A session
+        // whose pane cannot be found therefore keeps the place it last had - but only for a grace
+        // period. After that the database is believed: the pane really has gone somewhere this
+        // cannot see, and the session is listed under its app instead of under a tab it has left.
+        private static readonly TimeSpan PlacementGrace = TimeSpan.FromSeconds(12);
+
         private void Place(List<SessionInfo> sessions)
         {
-            if (!sessions.Any(s => s.WarpUuid.Length > 0))
+            var inWarp = sessions.Where(s => s.WarpUuid.Length > 0).ToList();
+            if (inWarp.Count == 0)
             {
+                this._placements.Clear();
                 return;
             }
 
-            if (DateTime.UtcNow - this._locationsReadAt > TimeSpan.FromMilliseconds(PollMs - 200))
+            // One sqlite3 run serves every reload inside the same poll interval.
+            var now = DateTime.UtcNow;
+            if (now - this._locationsReadAt > TimeSpan.FromMilliseconds(PollMs - 200))
             {
                 this._locations = WarpTabs.Read();
-                this._locationsReadAt = DateTime.UtcNow;
+                this._locationsReadAt = now;
             }
 
-            foreach (var s in sessions.Where(s => s.WarpUuid.Length > 0))
+            foreach (var session in inWarp)
             {
-                if (this._locations.TryGetValue(s.WarpUuid, out var loc))
+                if (this._locations.TryGetValue(session.WarpUuid, out var found))
                 {
-                    this._lastSeen[s.WarpUuid] = loc;
-                    s.Location = loc;
+                    this._placements[session.WarpUuid] = (found, now);
+                    session.Location = found;
                 }
-                else if (this._lastSeen.TryGetValue(s.WarpUuid, out var remembered))
+                else if (this._placements.TryGetValue(session.WarpUuid, out var last) && now - last.SeenAt <= PlacementGrace)
                 {
-                    s.Location = remembered;
+                    // Still within the grace period - but whatever it was, it no longer has the keyboard.
+                    session.Location = new PaneLocation
+                    {
+                        WindowId = last.Where.WindowId,
+                        TabId = last.Where.TabId,
+                        TabTitle = last.Where.TabTitle,
+                        Ordinal = last.Where.Ordinal,
+                        Focused = false,
+                    };
                 }
             }
 
-            var live = new HashSet<String>(sessions.Select(s => s.WarpUuid), StringComparer.Ordinal);
-            foreach (var gone in this._lastSeen.Keys.Where(k => !live.Contains(k)).ToList())
+            var current = inWarp.Select(s => s.WarpUuid).ToHashSet(StringComparer.Ordinal);
+            foreach (var pane in this._placements.Keys.Where(k => !current.Contains(k)).ToList())
             {
-                this._lastSeen.Remove(gone);
+                this._placements.Remove(pane);
             }
         }
 
@@ -494,7 +466,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             var list = new List<TransitionEventArgs>();
 
-            // The first pass after a load describes history, not news.
+            // Whatever state the sessions are in when the plugin starts is not something that just
+            // happened, so the first reading sets the baseline and announces nothing.
             if (!this._primed)
             {
                 return list;
@@ -556,7 +529,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
             catch (Exception)
             {
-                // Not allowed to look is not the same as not there.
+                // Being refused information about a process does not make it dead.
                 return true;
             }
         }
@@ -577,20 +550,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             this._disposed = true;
             this.Changed = null;
             this.Transition = null;
-            try
-            {
-                if (this._watcher != null)
-                {
-                    this._watcher.EnableRaisingEvents = false;
-                    this._watcher.Dispose();
-                }
-            }
-            catch
-            {
-            }
-
-            this._debounce.Dispose();
-            this._poll.Dispose();
+            this._watch.Dispose();
             TranscriptStats.Clear();
         }
     }
