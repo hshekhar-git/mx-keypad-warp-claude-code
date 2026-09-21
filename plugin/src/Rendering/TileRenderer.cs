@@ -373,19 +373,27 @@ namespace Loupedeck.ClaudeDeckPlugin
                 : $"{at:ddd} {at:h:mm}{at.ToString("tt", System.Globalization.CultureInfo.InvariantCulture).ToLowerInvariant()}";
         }
 
-        // The three keys of the usage row, left to right. The third is a per-model weekly bucket when
-        // Claude Code reports one, and otherwise the pace of the session window.
-        public static BitmapImage UsageKey(Int32 index, PluginImageSize size)
+        // The three keys of the usage row, left to right. The third is a per-model weekly window when
+        // the plan keeps one - on a session's page the one that counts THAT session's model, elsewhere
+        // whichever is fullest - and otherwise the pace of the session window.
+        public static BitmapImage UsageKey(Int32 index, PluginImageSize size, SessionInfo page = null)
         {
+            UsageProbe.Wanted();
             var u = UsageStore.Current;
-            return index switch
+            if (index == 0)
             {
-                0 => Usage(u.Session, u.Age, size),
-                1 => Usage(u.Weekly, u.Age, size),
-                _ => u.Models.Count > 0
-                    ? Usage(new UsageWindow { Title = u.Models[0].Title.ToLowerInvariant(), Percent = u.Models[0].Percent, ResetsAt = u.Models[0].ResetsAt }, u.Age, size)
-                    : Pace(u.Session, u.Age, size),
-            };
+                return Usage(u.Session, u.Age, size);
+            }
+
+            if (index == 1)
+            {
+                return Usage(u.Weekly, u.Age, size);
+            }
+
+            var model = page != null ? UsageStore.ModelWindow(page) : u.Models.OrderByDescending(m => m.Percent).FirstOrDefault();
+            return model != null
+                ? Usage(new UsageWindow { Title = $"{model.Title.ToLowerInvariant()} week", Percent = model.Percent, ResetsAt = model.ResetsAt }, u.Age, size)
+                : Pace(u.Session, u.Age, size);
         }
 
         // ---- the main page ------------------------------------------------------------------

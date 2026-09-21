@@ -25,7 +25,7 @@ let session project title state kind tool detail ctx sinceSecs =
                         Detail = detail, Since = now - sinceSecs, TurnSince = now - 95L, Started = now - 7500L,
                         Turns = 12, Mode = "acceptEdits", Bundle = "dev.warp.Warp-Stable")
     s.Title <- title
-    s.Selected <- ModelNames.FromDisplay "Opus 5 (1M context)"
+    s.Selected <- ModelNames.FromDisplay "Fable 5.1 (1M context)"
     s.Effort <- "high"
     s.ContextTokens <- int64 (ctx * 1000000.0)
     s.ContextWindow <- 1000000
@@ -74,11 +74,16 @@ let nextWednesday =
     (d.Date.AddDays(float (((3 - int d.DayOfWeek) + 7) % 7 + (if d.DayOfWeek = DayOfWeek.Wednesday then 7 else 0)))).AddHours 21.5
 File.WriteAllText(
     Path.Combine(usageDir, "usage.json"),
-    sprintf """{"activity":%d,"ts":%d,"five_hour":{"used_percentage":62,"resets_at":%d},"seven_day":{"used_percentage":41,"resets_at":%d},"model_scoped":[]}"""
-        now now (now + 2L * 3600L + 14L * 60L) (DateTimeOffset(nextWednesday).ToUnixTimeSeconds()))
+    sprintf """{"activity":%d,"ts":%d,"five_hour":{"used_percentage":62,"resets_at":%d},"seven_day":{"used_percentage":41,"resets_at":%d},"model_scoped":[{"display_name":"Fable","utilization":57,"resets_at":%d}]}"""
+        now now (now + 2L * 3600L + 14L * 60L) (DateTimeOffset(nextWednesday).ToUnixTimeSeconds()) (DateTimeOffset(nextWednesday).ToUnixTimeSeconds()))
+// Made-up numbers only: never let the guide ask the real account.
+File.WriteAllText(Path.Combine(usageDir, "config.json"), """{ "usage": { "perModel": false } }""")
+DeckConfig.Start()
+Threading.Thread.Sleep 300
 UsageStore.Start()
 Threading.Thread.Sleep 400
 let usage i = TileRenderer.UsageKey(i, size)
+let usageFor (s: SessionInfo) = [ for i in 0 .. 2 -> TileRenderer.UsageKey(i, size, s) ]
 
 // ---- the scenes -------------------------------------------------------------------------------
 // 1  a bare profile, as Options+ shows it before anything is placed
@@ -115,28 +120,22 @@ save "list" [ back (); tile web true 0; tile api false 0; tile docs false 0; til
 let model  = new SettingStepper(ModelSetting())
 let effort = new SettingStepper(EffortSetting())
 let mode   = new SettingStepper(ModeSetting())
-save "page" [
+save "page" ([
     back ()
     TileRenderer.Back(ResizeArray [ api; docs; infra; mobile ], false, size, 0)
     tile web true 2
-    TileRenderer.Info(web, size)
     model.Render(web, false, size)
     effort.Render(web, false, size)
-    mode.Render(web, false, size)
-    TileRenderer.Command("esc", null, false, size)
-    TileRenderer.Command("/compact", null, false, size) ]
+    mode.Render(web, false, size) ] @ usageFor web)
 
 // 6  a blocked session's page: the answers come first
-save "answer" [
+save "answer" ([
     back ()
     TileRenderer.Back(ResizeArray [ web; docs; infra; mobile ], false, size, 0)
     tile api true 0
     TileRenderer.Command("yes", "green", false, size)
     TileRenderer.Command("always", "amber", false, size)
-    TileRenderer.Command("no", "red", false, size)
-    TileRenderer.Info(api, size)
-    model.Render(api, false, size)
-    effort.Render(api, false, size) ]
+    TileRenderer.Command("no", "red", false, size) ] @ usageFor api)
 
 // 7  a multiple-choice question
 let asking = session "api" "Rate limiter for /search" "attention" "question" "AskUserQuestion" "" 0.18 25L
@@ -148,28 +147,22 @@ question.Title <- asking.Title
 question.Selected <- asking.Selected
 question.ContextTokens <- 180000L
 question.ContextWindow <- 1000000
-save "question" [
+save "question" ([
     back ()
     TileRenderer.Back(ResizeArray [ web; docs; infra; mobile ], false, size, 0)
     tile question true 0
     TileRenderer.Command("1 Redis", "coral", false, size)
     TileRenderer.Command("2 Postgres", "coral", false, size)
-    TileRenderer.Command("3 In memory", "coral", false, size)
-    TileRenderer.Info(question, size)
-    model.Render(question, false, size)
-    effort.Render(question, false, size) ]
+    TileRenderer.Command("3 In memory", "coral", false, size) ] @ usageFor question)
 
 // 8  tap-to-step, mid-gesture
-save "step" [
+save "step" ([
     back ()
     TileRenderer.Back(ResizeArray [ api; docs; infra; mobile ], false, size, 0)
     tile docs true 0
-    TileRenderer.Info(docs, size)
     model.Render(docs, false, size)
     TileRenderer.Model("effort", "xhigh", TileRenderer.Ascii.Countdown 0.6, "coral", true, false, size)
-    mode.Render(docs, false, size)
-    TileRenderer.Command("esc", null, false, size)
-    TileRenderer.Command("/compact", null, false, size) ]
+    mode.Render(docs, false, size) ] @ usageFor docs)
 
 // 9  the app switcher - icons come from the cache the plugin keeps; any that are missing fall back
 //    to a lettered square, so this runs on a machine that has never run the plugin
@@ -187,5 +180,6 @@ save "apps" [
     TileRenderer.App(app "Preview" "com.apple.Preview" false, false, "", 0, false, size) ]
 
 UsageStore.Shutdown()
+DeckConfig.Shutdown()
 Directory.Delete(usageDir, true)
 printfn "tiles -> %s (%d files)" root (Directory.GetFiles(root).Length)

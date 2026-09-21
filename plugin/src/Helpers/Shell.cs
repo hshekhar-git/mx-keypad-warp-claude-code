@@ -1,6 +1,7 @@
 namespace Loupedeck.ClaudeDeckPlugin
 {
     using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
 
     // Every external program this plugin runs goes through here, with its arguments passed as a
@@ -15,7 +16,10 @@ namespace Loupedeck.ClaudeDeckPlugin
             public Boolean Ok => this.ExitCode == 0;
         }
 
-        public static Result Run(String exe, Int32 timeoutMs, params String[] args)
+        public static Result Run(String exe, Int32 timeoutMs, params String[] args) => RunIn(null, null, exe, timeoutMs, args);
+
+        // The same, from a given directory and with extra environment variables.
+        public static Result RunIn(String directory, IReadOnlyDictionary<String, String> environment, String exe, Int32 timeoutMs, params String[] args)
         {
             try
             {
@@ -23,9 +27,20 @@ namespace Loupedeck.ClaudeDeckPlugin
                 {
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
+                    RedirectStandardInput = true,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
+                if (!String.IsNullOrEmpty(directory))
+                {
+                    psi.WorkingDirectory = directory;
+                }
+
+                foreach (var (name, value) in environment ?? new Dictionary<String, String>())
+                {
+                    psi.Environment[name] = value;
+                }
+
                 foreach (var a in args)
                 {
                     psi.ArgumentList.Add(a);
@@ -36,6 +51,9 @@ namespace Loupedeck.ClaudeDeckPlugin
                 {
                     return new Result { ExitCode = -1, Error = "no-process" };
                 }
+
+                // Nothing run from here is interactive; a child that asks is told there is no one.
+                p.StandardInput.Close();
 
                 // Read stderr off-thread so a chatty child cannot deadlock against a full pipe.
                 var errTask = p.StandardError.ReadToEndAsync();

@@ -23,6 +23,9 @@
 set -u
 umask 077
 
+# The plugin's own `claude -p /usage` is not a session.
+[ -z "${CLAUDE_DECK_PROBE:-}" ] || exit 0
+
 ROOT="${CLAUDE_DECK_ROOT:-$HOME/.claude/deck}"
 DIR="$ROOT/sessions"
 EVENT="${1:-}"

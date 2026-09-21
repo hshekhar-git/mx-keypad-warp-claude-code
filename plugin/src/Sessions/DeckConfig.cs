@@ -104,6 +104,15 @@ namespace Loupedeck.ClaudeDeckPlugin
         // The list keeps its bottom row for plan usage, leaving five session tiles a page.
         public static Boolean UsageRow => _current.UsageRow;
 
+        // A session's page keeps its bottom row for plan usage too, the third key being its model's.
+        public static Boolean PageUsageRow => _current.PageUsageRow;
+
+        // Ask Claude Code for /usage while a usage key is on show, for the per-model weekly figure.
+        public static Boolean UsagePerModel => _current.UsagePerModel;
+
+        // Where claude is, if it is not in one of the usual places.
+        public static String ClaudePath => _current.ClaudePath;
+
         // Opening a session's page also brings its pane to the front.
         public static Boolean FocusOnOpen => _current.FocusOnOpen;
 
@@ -217,6 +226,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             public String SessionGrouping { get; private set; } = "flat";
             public Boolean FocusOnOpen { get; private set; } = true;
             public Boolean UsageRow { get; private set; } = true;
+            public Boolean PageUsageRow { get; private set; } = true;
+            public Boolean UsagePerModel { get; private set; } = true;
+            public String ClaudePath { get; private set; } = "";
             public IReadOnlyList<ModelDef> Models { get; private set; } = new List<ModelDef>
             {
                 new() { Label = "Fable", Alias = "fable", Color = "violet" },
@@ -307,10 +319,17 @@ namespace Loupedeck.ClaudeDeckPlugin
                     }
                 }
 
+                if (root.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object)
+                {
+                    s.UsagePerModel = Bool(usage, "perModel", true);
+                    s.ClaudePath = Str(usage, "claudePath");
+                }
+
                 if (root.TryGetProperty("sessions", out var sess) && sess.ValueKind == JsonValueKind.Object)
                 {
                     s.FocusOnOpen = Bool(sess, "focusOnOpen", true);
                     s.UsageRow = Bool(sess, "usageRow", true);
+                    s.PageUsageRow = Bool(sess, "pageUsageRow", true);
                     if (Str(sess, "group").ToLowerInvariant() is "flat" or "tab")
                     {
                         s.SessionGrouping = Str(sess, "group").ToLowerInvariant();

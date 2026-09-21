@@ -32,14 +32,18 @@ namespace Loupedeck.ClaudeDeckPlugin
         public TimeSpan Age => DateTime.Now - this.TakenAt;
     }
 
-    // Plan usage, as written by deck-statusline.sh from Claude Code's own status-line payload. No
-    // credentials and no network: if Claude Code has not said, this does not know.
+    // Plan usage, as written by deck-statusline.sh from Claude Code's own status-line payload, with
+    // what UsageProbe reads off `claude -p /usage` laid over it. No credentials and no network here:
+    // if Claude Code has not said, this does not know.
     public static class UsageStore
     {
         private static readonly Object Gate = new();
         private static Timer _poll;
         private static DateTime _stamp = DateTime.MinValue;
         private static volatile UsageSnapshot _current = UsageSnapshot.None;
+
+        // What the status line last reported, before anything from the probe is laid over it.
+        private static volatile UsageSnapshot _reported = UsageSnapshot.None;
 
         public static event EventHandler Changed;
 
@@ -66,6 +70,51 @@ namespace Loupedeck.ClaudeDeckPlugin
         }
 
         private static void Poll()
+        {
+            UsageProbe.Tick();
+            ReadFile();
+        }
+
+        // The status line is the better source for the two plan windows - it is fresh whenever a
+        // session is working, for free. The probe fills in what the status line never carries (the
+        // per-model weekly windows), and stands in for all of it once the status line has gone quiet.
+        public static void Recompose()
+        {
+            var reported = _reported;
+            var probe = UsageProbe.Latest;
+            var probeIsNewer = probe.IsKnown && probe.TakenAt - reported.TakenAt > TimeSpan.FromMinutes(10);
+            _current = new UsageSnapshot
+            {
+                TakenAt = probeIsNewer ? probe.TakenAt : reported.TakenAt,
+                Session = probeIsNewer && probe.Session.IsKnown ? probe.Session : reported.Session,
+                Weekly = probeIsNewer && probe.Weekly.IsKnown ? probe.Weekly : reported.Weekly,
+                Models = reported.Models.Count > 0 ? reported.Models : probe.Models,
+            };
+            Changed?.Invoke(null, EventArgs.Empty);
+        }
+
+        // The weekly window that counts this session's model, if the plan keeps one for it.
+        public static UsageWindow ModelWindow(SessionInfo s)
+        {
+            if (s == null)
+            {
+                return null;
+            }
+
+            foreach (var w in _current.Models)
+            {
+                if (w.Title.Length > 0
+                    && (s.Selected.Name.Contains(w.Title, StringComparison.OrdinalIgnoreCase)
+                        || s.Model.Contains(w.Title, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return w;
+                }
+            }
+
+            return null;
+        }
+
+        private static void ReadFile()
         {
             try
             {
@@ -98,7 +147,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     }
                 }
 
-                _current = new UsageSnapshot
+                _reported = new UsageSnapshot
                 {
                     // How old the NUMBERS are is when the reporting session last heard from the API,
                     // not when it last happened to redraw its status line.
@@ -111,7 +160,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                     Weekly = root.TryGetProperty("seven_day", out var seven) ? Window(seven, "weekly", "used_percentage") : new UsageWindow { Title = "weekly" },
                     Models = models,
                 };
-                Changed?.Invoke(null, EventArgs.Empty);
+                Recompose();
             }
             catch (Exception ex)
             {

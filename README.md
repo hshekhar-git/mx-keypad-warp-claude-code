@@ -27,7 +27,7 @@ Every tile below was drawn by the plugin's own renderer (`tools/make-steps.sh` r
 |---|---|
 | <img src="docs/steps/01-install.png" alt="Step 1: install with one command."> | <img src="docs/steps/02-place.png" alt="Step 2: drag the keys onto the keypad in Logi Options+."> |
 | <img src="docs/steps/03-main.png" alt="Step 3: the main page with one session blocked."> | <img src="docs/steps/04-calm.png" alt="The main page when nothing needs you."> |
-| <img src="docs/steps/05-list.png" alt="Step 4: the sessions list, five sessions above the usage row."> | <img src="docs/steps/06-page.png" alt="Step 5: one session's page with info, model, effort and mode."> |
+| <img src="docs/steps/05-list.png" alt="Step 4: the sessions list, five sessions above the usage row."> | <img src="docs/steps/06-page.png" alt="Step 5: one session's page: model, effort and mode over a usage row for its model."> |
 | <img src="docs/steps/07-answer.png" alt="Step 6: a blocked session's page with yes, always and no keys."> | <img src="docs/steps/08-question.png" alt="A multiple-choice question with the real options on the keys."> |
 | <img src="docs/steps/09-step.png" alt="Step 7: tap to step, with a countdown bar."> | <img src="docs/steps/10-apps.png" alt="Step 8: the app switcher with icons and a session badge."> |
 
@@ -72,10 +72,14 @@ The list inside **Claude Sessions** keeps its bottom row for your plan:
 ├───────────┼───────────┼───────────┤   and the usage row comes with it
 │ session 3 │ session 4 │ session 5 │
 ├───────────┼───────────┼───────────┤   session   the five-hour window: % used, resets in 2h 13m
-│  session  │  weekly   │   pace    │   weekly    all models, this week: % used, resets Wed 9:30pm
-│    88%    │    65%    │    22m    │   pace      what the usage page does not say - see below
+│  session  │  weekly   │fable week │   weekly    all models, this week: % used, resets Wed 9:30pm
+│    88%    │    65%    │    57%    │   third key a model's own weekly window, or pace - see below
 └───────────┴───────────┴───────────┘
 ```
+
+**The third key** is a per-model weekly window - `Current week (Fable)` on the usage page - when your
+plan keeps one. In the list it is whichever is fullest; **on a session's page it is the one that counts
+that session's model.** When there is no such window (or none for that model), it shows pace.
 
 **Pace** answers "do I make it to the reset?". From how much of the five-hour window has gone and how
 much you have used, it projects where you land: `~85% by the reset` in green if you make it, or
@@ -84,18 +88,29 @@ much you have used, it projects where you land: `~85% by the reset` in green if 
 **Where the numbers come from.** Claude Code passes its status line a payload that includes your plan
 usage, so the installer sets a status line command (`deck-statusline.sh`) that copies those numbers to
 `~/.claude/deck/usage.json` - and, per session, the exact model, effort and context fill, which replace
-what was otherwise inferred from transcripts. It reads **no credentials and makes no network calls**.
+what was otherwise inferred from transcripts.
+
+The per-model window is not in that payload - nor in anything else Claude Code hands out. So while a
+usage key is on show, and at most every five minutes, the plugin asks Claude Code for it: it runs
+`claude -p /usage --no-session-persistence`, which prints the usage page as text (no model call, no
+tokens, no session saved), and reads the `Current ...: N% used` lines. **Press any usage key** to ask
+again now. `"usage": { "perModel": false }` turns this off, and the third key goes back to pace.
+
+The plugin itself reads **no credentials and opens no network connection**: the status line is Claude
+Code telling it, and the probe is Claude Code being asked - signing in and calling home exactly as it
+does when you type `/usage`.
 
 - If you had a status line already, it is kept: yours still runs on the same input and its output is
   what you see. With none, you get a small one: `Fable 5.1 · ctx 32% · 5h 88% · wk 65%`.
 - Each session reports the figures from *its own last API response*, so a session idle since Tuesday
   reports Tuesday's. A report only counts if its session has been active more recently than the one
   on file; numbers older than 20 minutes are shown greyed with their age.
-- The status line carries the five-hour and weekly (all models) windows only. The per-model weekly bar
-  on the usage page (e.g. *Fable*) is not in it; if Claude Code adds it, the third key shows it
-  instead of pace automatically.
+- When no session has been active for a while, the probe's figures stand in for the status line's, so
+  the row is not left greyed out just because everything is idle.
+- The probe runs from `~/.claude/deck`, which leaves one empty folder for that path under
+  `~/.claude/projects`. The hook ignores it, so it never appears as a session.
 - The same three keys exist for the main page under **Usage**. `"usageRow": false` gives the list all
-  eight keys back.
+  eight keys back; `"pageUsageRow": false` does the same for a session's page.
 
 ## Two layers
 
@@ -107,17 +122,23 @@ one and you are on that session's own page:**
 │  ‹ Back   │ ‹ sessions│  the tile │   ‹ sessions  up one level - and the other sessions' way of
 │ (Options+)│  ● ● ●    │ Edit 2:31 │                 tapping you on the shoulder (see below)
 ├───────────┼───────────┼───────────┤   the tile    live; press = jump to its pane, hold = interrupt
-│  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
-│ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch)
-│ feat/hero │ 1M context│           │   effort      auto · low · medium · high · xhigh · max
-├───────────┼───────────┼───────────┤   mode        ask · auto-edit · plan · [bypass] · [auto]
-│   mode    │    esc    │ /compact  │   then your command keys; more on the next page ▶
-│ auto-edit │           │           │
+│   model   │  effort   │   mode    │   model       tap to step (see Model switch)
+│ Fable 5.1 │   high    │ auto-edit │   effort      auto · low · medium · high · xhigh · max
+│ 1M context│           │           │   mode        ask · auto-edit · plan · [bypass] · [auto]
+├───────────┼───────────┼───────────┤
+│  session  │  weekly   │fable week │   plan usage, as under the list - but the third key is the
+│    88%    │    65%    │    57%    │   weekly window of THIS session's model
 └───────────┴───────────┴───────────┘
+  page two ▶  info (context % and tokens, branch, turns, age) · esc · /compact · your other keys,
+              over the same usage row
 ```
 
+`"pageUsageRow": false` drops the usage row from the page and puts info, the settings and your keys
+back on one page of eight.
+
 While the session is **blocked**, the answers come first, straight after the tile: **yes / always / no**
-for a permission prompt, the **actual option labels** for a multiple-choice question.
+for a permission prompt, the **actual option labels** for a multiple-choice question. (A question with
+four or more options takes the usage row's keys too, rather than splitting its answers over two pages.)
 
 **While you are inside one session, the `‹ sessions` key watches the rest.** It blinks **red** with
 the name - `web-app needs you` - when another session is blocked on you (`2 need you` for several),
@@ -434,7 +455,8 @@ annotated version; the installer seeds your copy from it.
 | `showContext` | the context-window gauge along the top of each tile |
 | `contextWindow`, `contextWindows` | the window size the gauge is measured against, when Claude Code has not said (it usually has - see [Plan usage](#plan-usage-on-the-keypad)) |
 | `haptics` | `attention` / `done` / `error` on or off, and `minTurnSeconds`: a turn shorter than this finishing is not announced |
-| `sessions` | `group`: `"flat"` or `"tab"` (one page per Warp tab) · `focusOnOpen`: opening a session also brings its pane forward · `usageRow`: the three usage keys under the list |
+| `sessions` | `group`: `"flat"` or `"tab"` (one page per Warp tab) · `focusOnOpen`: opening a session also brings its pane forward · `usageRow`: the three usage keys under the list · `pageUsageRow`: and under a session's page |
+| `usage` | `perModel`: ask Claude Code (`claude -p /usage`) for the per-model weekly window while a usage key is showing · `claudePath`: where `claude` is, if not in `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin` |
 | `models` | what **Model** steps through and **Models** lists: `alias` (typed after `/model`), `label`, `match`, `color` |
 | `apps` | the App Switcher: `pinned` and `hidden` bundle ids, `order` (`recent` / `launch` / `name`), `closeOnSwitch` |
 | `keys` | the command keys on every session's page, also published under **Commands** for your home page: `label`, `text`, `submit`, `key` (`"escape"`), `color`, and an optional `id` |
@@ -514,8 +536,9 @@ docs/steps/                   steps.html - the walkthrough as a page - and the P
 - `warp.sqlite` is Warp's private format. If it changes, the query fails quietly and Warp sessions
   are listed by app instead of by tab, without the "you are here" mark; status and focus carry on.
 - A session that was already running when the hooks were installed appears on its next event.
-- Plan usage covers the five-hour and weekly (all models) windows - the two the status line carries.
-  The numbers are as fresh as the most recently active session's last API response.
+- The five-hour and weekly (all models) windows are as fresh as the most recently active session's
+  last API response. A per-model weekly window comes from asking `claude -p /usage`, read as text: up
+  to five minutes old, and if Claude Code rewords that page the third key falls back to pace.
 - A prompt you answer **in the terminal** (rather than from the keypad) leaves its tile red until the
   approved command finishes: Claude Code has no event for "the prompt was answered".
 - Keys that type (answers, command keys, model / effort / mode) need Accessibility, and refuse to

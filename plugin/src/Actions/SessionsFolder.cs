@@ -12,10 +12,12 @@ namespace Loupedeck.ClaudeDeckPlugin
     //        sixth session starts page two and the numbers come with you. Off, it is eight sessions.
     //        Press a session to open it; hold one to interrupt it without going in.
     //
-    // PAGE   one session: a way back (which also reports on everyone else - see below), its live tile (press = jump to its pane), its facts (context,
-    //        branch, turns, age), its settings (model, effort, permission mode - tap to step), then
-    //        your command keys. While it is blocked on a prompt the keypad can answer, the answers
-    //        come first, straight after the tile.
+    // PAGE   one session: a way back (which also reports on everyone else - see below), its live tile
+    //        (press = jump to its pane), its settings (model, effort, permission mode - tap to step),
+    //        its facts (context, branch, turns, age), then your command keys. While it is blocked on a
+    //        prompt the keypad can answer, the answers come first, straight after the tile. Like the
+    //        list, a page keeps its bottom row for plan usage - here the third key is the weekly
+    //        window of THIS session's model - so it runs to a second page sooner.
     //
     // The host keeps the top-left key for its own Back, which leaves the folder entirely; hence the
     // page's own "sessions" key for going up one level. Eight names per page keeps both layers
@@ -178,9 +180,32 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 list.Add("p:lowpri");
             }
-            list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
+            // A question with more answers than fit above the usage row gets the whole page instead:
+            // answers split across two pages are worse than a minute without the numbers.
+            if (!DeckConfig.PageUsageRow || answers.Count > KeysPerPage - 5)
+            {
+                list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
+                list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
+                return list;
+            }
+
+            // With the usage row a page is five keys over three, so what you change comes before
+            // what you only read: the settings share the first page with the tile, and the facts and
+            // your own keys follow. Answers, when there are any, take the settings' place.
+            list.AddRange(new[] { "p:model", "p:effort", "p:mode", "p:info" });
             list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
-            return list;
+
+            var perPage = KeysPerPage - 3;
+            var paged = new List<String>();
+            for (var i = 0; i < list.Count; i += perPage)
+            {
+                var keys = list.Skip(i).Take(perPage).ToList();
+                paged.AddRange(keys);
+                paged.AddRange(Enumerable.Range(keys.Count, perPage - keys.Count).Select(n => $"x:page:{i}:{n}"));
+                paged.AddRange(Enumerable.Range(0, 3).Select(n => $"p:u:{n}:{i}"));
+            }
+
+            return paged;
         }
 
         public override IEnumerable<String> GetButtonPressActionNames(DeviceType deviceType) =>
@@ -411,6 +436,13 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return;
             }
 
+            // A usage key: ask again now rather than at the next five minutes.
+            if (actionParameter.StartsWith("u:", StringComparison.Ordinal) || actionParameter.StartsWith("p:u:", StringComparison.Ordinal))
+            {
+                UsageProbe.Tick(force: true);
+                return;
+            }
+
             if (!actionParameter.StartsWith("p:", StringComparison.Ordinal))
             {
                 return;
@@ -512,6 +544,11 @@ namespace Loupedeck.ClaudeDeckPlugin
             if (page == null)
             {
                 return TileRenderer.Dark(imageSize);
+            }
+
+            if (actionParameter.StartsWith("p:u:", StringComparison.Ordinal))
+            {
+                return TileRenderer.UsageKey(actionParameter[4] - '0', imageSize, page);
             }
 
             switch (actionParameter)
