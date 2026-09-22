@@ -126,7 +126,7 @@ one and you are on that session's own page:**
 │  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
 │ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch); underneath, how
 │ feat/hero │1M·week 57%│           │               much of THAT model's weekly window is gone
-├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max
+├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max · ultracode
 │   mode    │    esc    │ /compact  │   mode        ask · auto-edit · plan · [bypass] · [auto]
 │ auto-edit │           │           │   then your command keys; more on the next page ▶
 └───────────┴───────────┴───────────┘
@@ -263,7 +263,7 @@ without opening it.
 | **Working** | how many are still running | walks them |
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
 | **Model** | the target session's model, and whether it is on the 1M window | steps to the next model; commits when you stop tapping |
-| **Effort** | its effort level | steps `auto → low → medium → high → xhigh → max` |
+| **Effort** | its effort level | steps `auto → low → medium → high → xhigh → max → ultracode` (xhigh plus multi-agent orchestration, this session only) |
 | **Permission mode** | `ask`, `auto-edit`, `plan`, and `bypass` / `auto` where enabled | steps it (Shift-Tab) |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |

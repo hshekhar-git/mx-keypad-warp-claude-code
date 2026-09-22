@@ -79,7 +79,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
     public sealed class EffortSetting : SessionSetting
     {
-        // The levels `claude --effort` and /effort accept, gentlest first.
+        // The levels /effort accepts, gentlest first.
         private static readonly SettingOption[] Levels =
         {
             new() { Label = "auto", Color = "" },
@@ -88,6 +88,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             new() { Label = "high", Color = "amber" },
             new() { Label = "xhigh", Color = "coral" },
             new() { Label = "max", Color = "red" },
+
+            // xhigh plus standing multi-agent orchestration; this session only.
+            new() { Label = "ultracode", Color = "purple" },
         };
 
         public override String Title => "effort";

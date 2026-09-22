@@ -17,7 +17,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         // empty otherwise. "Opus 5 (1M context)".
         public String SwitchedTo { get; init; } = "";
 
-        // From the last /effort in this session: low | medium | high | xhigh | max | auto. Empty when
+        // From the last /effort in this session: low | medium | high | xhigh | max | ultracode | auto. Empty when
         // the session never ran one, in which case it is on the default.
         public String Effort { get; init; } = "";
 

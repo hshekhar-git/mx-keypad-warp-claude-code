@@ -437,7 +437,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                     s.Selected = new ModelName { Name = name.Name, OneM = oneM };
                 }
 
-                if (status.Effort.Length > 0)
+                // The status line reports ultracode as the xhigh it runs at; the transcript knows better.
+                if (status.Effort.Length > 0 && !(s.Effort == "ultracode" && status.Effort == "xhigh"))
                 {
                     s.Effort = status.Effort;
                 }
