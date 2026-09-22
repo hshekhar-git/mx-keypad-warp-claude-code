@@ -32,6 +32,9 @@ namespace Loupedeck.ClaudeDeckPlugin
         // ...and on a session's own page (which shows the title on top, so has room for more).
         public virtual String Detail(SessionInfo s) => "tap to change";
 
+        // While stepping, next to the title: what choosing this option would mean.
+        public virtual String Preview(SessionInfo s, Int32 option) => "";
+
         // Why it cannot be changed right now, or null.
         public virtual String Blocked(SessionInfo s) => Deck.Busy(s);
 
@@ -100,6 +103,16 @@ namespace Loupedeck.ClaudeDeckPlugin
         public override Int32 CurrentIndex(SessionInfo s) => Array.FindIndex(Levels, l => l.Label == s.Effort);
 
         public override String CurrentText(SessionInfo s) => s.Effort.Length > 0 ? s.Effort : "auto";
+
+        // How fast this session burns the plan at this effort, against Opus 5: "~2.8x opus".
+        public override String Hint(SessionInfo s) => Rate(s, s.Effort) is { Length: > 0 } r ? $"effort · {r.Replace(" opus", "")}" : "effort";
+
+        public override String Detail(SessionInfo s) => Rate(s, s.Effort) is { Length: > 0 } r ? r : "tap to change";
+
+        public override String Preview(SessionInfo s, Int32 option) =>
+            option >= 0 && option < Levels.Length ? Rate(s, Levels[option].Label).Replace(" opus", "") : "";
+
+        private static String Rate(SessionInfo s, String effort) => s == null ? "" : ModelCosts.Label(s, effort);
 
         public override Boolean Apply(SessionInfo s, Int32 from, Int32 to) =>
             to >= 0 && to < Levels.Length && Deck.RunSlash(s, $"/effort {Levels[to].Label}");
@@ -308,12 +321,15 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             var options = this.Setting.Options;
             var pending = this._pending;
+            var session = pending >= 0 ? SessionStore.Instance.Find(this._sessionKey) ?? target : target;
             if (pending >= 0 && pending < options.Count)
             {
                 // How long until the taps are taken as final, as a bar running down.
                 var left = (new DateTime(Interlocked.Read(ref this._commitsAtTicks)) - DateTime.UtcNow).TotalMilliseconds / CommitMs;
                 var hint = DeckConfig.Ascii ? TileRenderer.Ascii.Countdown(left) : "tap: next";
-                return TileRenderer.Model(this.Setting.Title, options[pending].Label, hint, options[pending].Color, true, false, size);
+                var preview = this.Setting.Preview(session, pending);
+                var title = preview.Length > 0 ? $"{this.Setting.Title} {preview}" : this.Setting.Title;
+                return TileRenderer.Model(title, options[pending].Label, hint, options[pending].Color, true, false, size);
             }
 
             if (target == null)

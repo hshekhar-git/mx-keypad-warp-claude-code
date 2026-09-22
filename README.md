@@ -125,11 +125,11 @@ one and you are on that session's own page:**
 ├───────────┼───────────┼───────────┤   the tile    live; press = jump to its pane, hold = interrupt
 │  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
 │ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch); underneath, how
-│ feat/hero │1M·week 57%│           │               much of THAT model's weekly window is gone
-├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max · ultracode
-│   mode    │    esc    │ /compact  │   mode        ask · auto-edit · plan · [bypass] · [auto]
-│ auto-edit │           │           │   then your command keys; more on the next page ▶
-└───────────┴───────────┴───────────┘
+│ feat/hero │1M·week 57%│ ~2x opus  │               much of THAT model's weekly window is gone
+├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max · ultracode;
+│   mode    │    esc    │ /compact  │               underneath, how fast this burns the plan (see below)
+│ auto-edit │           │           │   mode        ask · auto-edit · plan · [bypass] · [auto]
+└───────────┴───────────┴───────────┘   then your command keys; more on the next page ▶
   next page ▶  any further command keys, then the usage row along the bottom:
                session · weekly · this session's model (fable week 57%)
 ```
@@ -154,6 +154,23 @@ limited; any later reply, or the reset time passing, means not.
 - **Everything that can be changed is changed the same way:** tap to step through the choices, ringed
   in white; it is sent once, a second and a half after your last tap. Tapping back round to the value
   in use sends nothing.
+- **The effort key's bottom line is the burn rate**: how fast the session eats your plan at that model
+  and effort, as a multiple of **Opus 5 at its default effort (high)**. `~2x opus` on Fable 5.1 at
+  high; tap towards `max` and the top of the key previews what you are stepping to (`effort ~3.5x`).
+  Two things set it: the model's price per token, and how much more it thinks at a higher effort -
+  both from Claude Code's own model table (the `effort_cost_index` it uses to say "~1.4x" when you
+  change effort). Plan usage is charged in proportion to price, so the product is the multiple.
+
+  | | low | medium | high | xhigh / ultracode | max |
+  |---|---|---|---|---|---|
+  | **Opus 5** | ~0.67x | ~0.76x | **1x** | ~1.6x | ~1.7x |
+  | **Fable 5.1** | ~1.5x | ~1.7x | ~2x | ~2.8x | ~3.5x |
+  | **Sonnet 5** | ~0.19x | ~0.3x | ~0.4x | ~0.96x | ~2.2x |
+  | **Haiku 4.5** | ~0.2x | ~0.2x | ~0.2x | ~0.2x | ~0.2x |
+
+  The table is Claude Code 2.1.278's (`plugin/src/Sessions/ModelCosts.cs`); a model it does not
+  list gets no line rather than a wrong one. It is a rate, not a bill: `~2x` means the same work
+  drains the weekly window twice as fast as it would on Opus 5.
 - **Effort** is read from the session's own `/effort` history (the whole transcript is searched once,
   since one early `/effort` can be megabytes back), else `effortLevel` in your settings, else `auto`.
 - **Permission mode** is changed with Shift-Tab, so a change is sent as that many steps round Claude
@@ -263,7 +280,7 @@ without opening it.
 | **Working** | how many are still running | walks them |
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
 | **Model** | the target session's model, and whether it is on the 1M window | steps to the next model; commits when you stop tapping |
-| **Effort** | its effort level | steps `auto → low → medium → high → xhigh → max → ultracode` (xhigh plus multi-agent orchestration, this session only) |
+| **Effort** | its effort level, and the burn rate against Opus 5 (`effort · ~2x`) | steps `auto → low → medium → high → xhigh → max → ultracode` (xhigh plus multi-agent orchestration, this session only) |
 | **Permission mode** | `ask`, `auto-edit`, `plan`, and `bypass` / `auto` where enabled | steps it (Shift-Tab) |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |

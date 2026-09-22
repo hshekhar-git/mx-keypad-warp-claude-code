@@ -171,7 +171,7 @@ save "step" [
     tile docs true 0
     TileRenderer.Info(docs, size)
     model.Render(docs, false, size)
-    TileRenderer.Model("effort", "xhigh", TileRenderer.Ascii.Countdown 0.6, "coral", true, false, size)
+    TileRenderer.Model("effort ~2.8x", "xhigh", TileRenderer.Ascii.Countdown 0.6, "coral", true, false, size)
     mode.Render(docs, false, size)
     TileRenderer.Command("esc", null, false, size)
     TileRenderer.Command("/compact", null, false, size) ]
