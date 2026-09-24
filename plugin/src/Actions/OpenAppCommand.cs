@@ -44,7 +44,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             var (state, count) = Apps.Badge(app.Bundle);
-            return TileRenderer.App(app, AppWatcher.Instance.Front == app.Bundle, state, count, false, PluginImageSize.Width116);
+            return TileRenderer.App(app, AppWatcher.Instance.Front == app.Bundle, state, count, false, imageWidth, imageHeight);
         }
 
         protected override String GetCommandDisplayName(ActionEditorActionParameters actionParameters) => "";

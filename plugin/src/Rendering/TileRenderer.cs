@@ -22,6 +22,43 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static readonly BitmapColor Blue = new(0x2A, 0x6C, 0xB0);
         private static readonly BitmapColor Violet = new(0x67, 0x50, 0xB5);
 
+        // The three greys of a dark key, from a dash standing in for a number up to its main line.
+        private static readonly BitmapColor Faint = Tint(Empty, 0.30);
+        private static readonly BitmapColor Muted = Tint(Empty, 0.50);
+        private static readonly BitmapColor Bright = Tint(Empty, 0.80);
+
+        // Secondary text: a light tint of the key on a coloured key, the middle grey on a dark one.
+        private static BitmapColor Soft(BitmapColor bg) => bg.R + bg.G + bg.B < 0xC0 ? Muted : Tint(bg, 0.82);
+
+        // ---- type ---------------------------------------------------------------------------
+        //
+        // One face at four sizes. Every line on every key is one of these, so keys sitting next to
+        // each other agree about what a caption is.
+        private const String Face = "Brown Logitech Pan Light";
+        private const Int32 Caption = 11;   // the header and footer of a key, and any aside
+        private const Int32 Body = 13;      // a sentence: what a session is doing, a wrapped label
+        private const Int32 Word = 19;      // one word that is the key: a command, a model, a level
+        private const Int32 Big = 22;       // one number that is the key
+
+        // Strings that are pictures - a countdown bar, a face - want cells of one width, which the
+        // key face does not give them.
+        private const String Mono = "IBM Plex Mono";
+
+        // A word shrinks rather than wraps: "ultracode" and "Fable 5.1" stay on one line.
+        private static Int32 WordSize(String word) => (word ?? "").Length > 9 ? 15 : Word;
+
+        // The header runs along the top edge of a key and the footer along the bottom, at the
+        // same height on every key. `nudge` moves the header down under a gauge.
+        private static void Head(BitmapBuilder b, String text, BitmapColor color, Int32 nudge = 0) =>
+            Band(b, text, 0.04, 0.18, Caption, color, nudge);
+
+        private static void Foot(BitmapBuilder b, String text, BitmapColor color) =>
+            Band(b, text, 0.74, 0.18, Caption, color);
+
+        // The middle of a key that carries one word, sized to fit.
+        private static void Centre(BitmapBuilder b, String word, BitmapColor color) =>
+            Band(b, word, 0.26, 0.40, WordSize(word), color);
+
         public const Int32 FrameMs = 250;
 
         public static BitmapColor ColourOf(String state) => state switch
@@ -64,22 +101,22 @@ namespace Loupedeck.ClaudeDeckPlugin
             b.Clear(bg);
 
             var fg = BitmapColor.White;
-            var soft = Tint(bg, 0.82);
+            var soft = Soft(bg);
 
             var top = DeckConfig.ShowContext ? DrawContext(b, s, bg) : 0;
 
             // Project, what it is about, what it is doing right now.
-            Band(b, header ?? Middle(Or(s.Project, "—"), 15), 0.03, 0.17, 11, header != null ? fg : soft, top);
-            Band(b, What(s), 0.20, 0.50, 13, fg, top);
+            Head(b, header ?? Middle(Or(s.Project, "—"), 15), header != null ? fg : soft, top);
+            Band(b, What(s), 0.20, 0.50, Body, fg, top);
             // The mark and the words are one string, so the mark sits beside the words and on their
             // baseline by construction - which also means it has to come from the key's main font.
-            Band(b, DeckConfig.Ascii ? Ascii.Status(s, Status(s), frame, JustFinished(s)) : Status(s), 0.74, 0.18, 11, soft);
+            Foot(b, DeckConfig.Ascii ? Ascii.Status(s, Status(s), frame, JustFinished(s)) : Marked(s, Status(s)), soft);
 
             if (s.State == "busy")
             {
                 if (DeckConfig.Ascii)
                 {
-                    b.DrawText(Ascii.Wave(frame, 19), 0, (Int32)(h * 0.905), w, (Int32)(h * 0.11), Tint(bg, 0.55), 9);
+                    b.DrawText(Ascii.Wave(frame, 19), 0, (Int32)(h * 0.905), w, (Int32)(h * 0.11), Tint(bg, 0.55), 9, -1, -1, Face);
                 }
                 else
                 {
@@ -192,6 +229,16 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static String ModelTag(SessionInfo s) => s.Selected.IsKnown ? $" · {s.Selected.Short}" : "";
 
+        // The plain style keeps the marks and drops the motion: the same tick, cross and bang as
+        // the animated one, just standing still. Working has its dots instead.
+        private static String Marked(SessionInfo s, String words) => s.IsLimited ? words : s.State switch
+        {
+            "done" => $"{Ascii.Tick} {words}",
+            "error" => $"{Ascii.Cross} {words}",
+            "attention" => $"{Ascii.Bang} {words}",
+            _ => words,
+        };
+
         public static String ToolName(String tool)
         {
             if (String.IsNullOrEmpty(tool))
@@ -240,14 +287,14 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             var bg = Named(color);
             b.Clear(bg);
-            // Answer keys carry whole option labels, so long text wraps in a taller box at a smaller size.
+            // Answer keys carry whole option labels, so long text wraps in a taller box at body size.
             if (label.Length > 10)
             {
-                Band(b, End(label, 40), 0.10, 0.80, 13, BitmapColor.White);
+                Band(b, End(label, 40), 0.10, 0.80, Body, BitmapColor.White);
             }
             else
             {
-                Band(b, label, 0.28, 0.44, label.Length > 7 ? 14 : 17, BitmapColor.White);
+                Centre(b, label, BitmapColor.White);
             }
 
             if (flash)
@@ -286,20 +333,19 @@ namespace Loupedeck.ClaudeDeckPlugin
             var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
-            var soft = Tint(Empty, 0.5);
-            Band(b, window.Title, 0.05, 0.18, 11, soft);
+            Head(b, window.Title, Muted);
 
             if (!window.IsKnown)
             {
-                Band(b, "–", 0.26, 0.34, 22, Tint(Empty, 0.3));
-                Band(b, "no data yet", 0.74, 0.18, 11, Tint(Empty, 0.35));
+                Band(b, Dash, 0.20, 0.36, Big, Faint);
+                Foot(b, "no data yet", Faint);
                 return b.ToImage();
             }
 
             // It only moves while a session is drawing its status line, so old numbers say so.
             var stale = age > TimeSpan.FromMinutes(20);
-            var color = stale ? Tint(Empty, 0.45) : UsageColor(window.Percent);
-            Band(b, $"{(Int32)Math.Round(window.Percent)}%", 0.20, 0.36, 22, color);
+            var color = stale ? Muted : UsageColor(window.Percent);
+            Band(b, $"{(Int32)Math.Round(window.Percent)}%", 0.20, 0.36, Big, color);
 
             var barX = (Int32)(w * 0.12);
             var barW = w - (2 * barX);
@@ -309,7 +355,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             b.FillRectangle(barX, barY, Math.Max(2, (Int32)(barW * Math.Min(1.0, window.Percent / 100.0))), barH, color);
 
             var bottom = stale ? $"{Span(age)} old" : window.ResetsAt > DateTime.Now ? ResetText(window.ResetsAt) : "";
-            Band(b, bottom, 0.74, 0.18, 11, soft);
+            Foot(b, bottom, Muted);
             return b.ToImage();
         }
 
@@ -320,15 +366,14 @@ namespace Loupedeck.ClaudeDeckPlugin
             var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
-            var soft = Tint(Empty, 0.5);
-            Band(b, "pace", 0.05, 0.18, 11, soft);
+            Head(b, "pace", Muted);
 
             String big, bottom;
             BitmapColor color;
             var (projected, runsOut) = UsageStore.Pace(session, TimeSpan.FromHours(5));
             if (!session.IsKnown || age > TimeSpan.FromMinutes(20))
             {
-                (big, bottom, color) = ("–", session.IsKnown ? "stale" : "no data yet", Tint(Empty, 0.3));
+                (big, bottom, color) = (Dash, session.IsKnown ? "stale" : "no data yet", Faint);
             }
             else if (session.Percent >= 100)
             {
@@ -336,7 +381,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
             else if (projected < 0)
             {
-                (big, bottom, color) = ("–", "too early to say", Tint(Empty, 0.4));
+                (big, bottom, color) = (Dash, "too early to say", Faint);
             }
             else if (runsOut != DateTime.MinValue)
             {
@@ -347,8 +392,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                 (big, bottom, color) = ($"~{(Int32)Math.Round(projected)}%", "by the reset", new BitmapColor(0x4C, 0xB8, 0x6E));
             }
 
-            Band(b, big, 0.22, 0.40, big.Length > 4 ? 18 : 22, color);
-            Band(b, bottom, 0.72, 0.20, 11, soft);
+            Band(b, big, 0.20, 0.36, big.Length > 4 ? Word : Big, color);
+            Foot(b, bottom, Muted);
             return b.ToImage();
         }
 
@@ -419,9 +464,9 @@ namespace Loupedeck.ClaudeDeckPlugin
                 : limited > 0 ? ($"{limited} at limit", Tint(Amber, 0.5))
                 : finished > 0 ? ($"{finished} your turn", Tint(Done, 0.5))
                 : working > 0 ? ($"{working} working", Tint(Busy, 0.4))
-                : all.Count > 0 ? ("all idle", Tint(Empty, 0.55))
-                : ("no sessions", Tint(Empty, 0.4));
-            Band(b, headline, 0.04, 0.24, 14, color);
+                : all.Count > 0 ? ("all idle", Muted)
+                : ("no sessions", Faint);
+            Band(b, headline, 0.04, 0.24, Body, color);
 
             var shown = all.Take(9).ToList();
             if (shown.Count == 0)
@@ -469,17 +514,17 @@ namespace Loupedeck.ClaudeDeckPlugin
             using var b = new BitmapBuilder(size);
             var h = b.Height;
             b.Clear(Empty);
-            Band(b, "NEXT", 0.05, 0.18, 11, Tint(Empty, 0.45));
+            Head(b, "NEXT", Muted);
             if (DeckConfig.Ascii)
             {
-                Band(b, total == 0 ? Ascii.Asleep : Ascii.Happy, 0.24, 0.22, 14, Tint(Empty, 0.8));
-                Band(b, total == 0 ? "no sessions" : "all clear", 0.48, 0.20, 12, Tint(Empty, 0.6));
+                Art(b, total == 0 ? Ascii.Asleep : Ascii.Happy, 0.24, 0.22, Body, Bright);
+                Band(b, total == 0 ? "no sessions" : "all clear", 0.48, 0.20, Caption, Muted);
             }
             else
             {
-                Band(b, total == 0 ? "no sessions" : "all clear", 0.28, 0.34, 16, Tint(Empty, 0.75));
+                Centre(b, total == 0 ? "no sessions" : "all clear", Bright);
             }
-            Band(b, working > 0 ? $"{working} working" : total > 0 ? "nothing running" : "start claude", 0.72, 0.18, 11, working > 0 ? Tint(Busy, 0.4) : Tint(Empty, 0.45));
+            Foot(b, working > 0 ? $"{working} working" : total > 0 ? "nothing running" : "start claude", working > 0 ? Tint(Busy, 0.4) : Muted);
             return b.ToImage();
         }
 
@@ -487,8 +532,15 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             using var b = new BitmapBuilder(size);
             b.Clear(Empty);
-            Band(b, DeckConfig.Ascii ? "[   ]" : "–", 0.26, 0.36, DeckConfig.Ascii ? 16 : 22, Tint(Empty, 0.25));
-            Band(b, $"slot {number}", 0.72, 0.18, 11, Tint(Empty, 0.3));
+            if (DeckConfig.Ascii)
+            {
+                Art(b, "[   ]", 0.26, 0.36, 16, Faint);
+            }
+            else
+            {
+                Band(b, Dash, 0.20, 0.36, Big, Faint);
+            }
+            Foot(b, $"slot {number}", Faint);
             return b.ToImage();
         }
 
@@ -502,7 +554,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var w = b.Width;
             var h = b.Height;
             b.Clear(Neutral);
-            var soft = Tint(Neutral, 0.6);
+            var soft = Soft(Neutral);
 
             var fill = s.ContextFill;
             var barH = Math.Max(6, (Int32)(h * 0.07));
@@ -513,14 +565,12 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             var headline = fill >= 0 ? $"{(Int32)Math.Round(fill * 100)}% ctx" : "ctx ?";
-            Band(b, headline, 0.10, 0.28, 17, fill >= 0.8 ? Warn : BitmapColor.White);
-            b.DrawText(fill >= 0 ? $"{Tokens(s.ContextTokens)} of {Tokens(s.ContextWindow)}" : "no reply yet",
-                2, (Int32)(h * 0.38), w - 4, (Int32)(h * 0.18), soft, 11);
-            Band(b, Middle(Or(s.Branch, "no branch"), 16), 0.58, 0.18, 11, BitmapColor.White);
+            Band(b, headline, 0.10, 0.28, Word, fill >= 0.8 ? Warn : BitmapColor.White);
+            Band(b, fill >= 0 ? $"{Tokens(s.ContextTokens)} of {Tokens(s.ContextWindow)}" : "no reply yet", 0.38, 0.18, Caption, soft);
+            Band(b, Middle(Or(s.Branch, "no branch"), 16), 0.56, 0.18, Caption, BitmapColor.White);
 
             var age = s.Started > 0 ? Elapsed(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - s.Started) : "";
-            b.DrawText($"{s.Turns} turn{(s.Turns == 1 ? "" : "s")}{(age.Length > 0 ? " · " + age : "")}",
-                2, (Int32)(h * 0.76), w - 4, (Int32)(h * 0.18), soft, 11);
+            Foot(b, $"{s.Turns} turn{(s.Turns == 1 ? "" : "s")}{(age.Length > 0 ? " · " + age : "")}", soft);
             return b.ToImage();
         }
 
@@ -561,8 +611,8 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             b.Clear(bg);
-            Band(b, "‹ sessions", 0.10, 0.28, 15, BitmapColor.White);
-            Band(b, note, 0.38, 0.30, 11, waiting.Count > 0 ? BitmapColor.White : Tint(bg, 0.7));
+            Band(b, $"{Ascii.Up} sessions", 0.10, 0.28, WordSize("sessions"), BitmapColor.White);
+            Band(b, note, 0.38, 0.30, Caption, waiting.Count > 0 ? BitmapColor.White : Soft(bg));
 
             var shown = others.Take(8).ToList();
             if (shown.Count > 0)
@@ -598,13 +648,21 @@ namespace Loupedeck.ClaudeDeckPlugin
         public static BitmapImage Model(String top, String name, String bottom, String color, Boolean ringed, Boolean dim, PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
-            var h = b.Height;
             var bg = dim ? Empty : Named(color);
             b.Clear(bg);
-            var soft = dim ? Tint(Empty, 0.5) : Tint(bg, 0.82);
-            Band(b, Middle(top, 15), 0.05, 0.18, 11, soft);
-            Band(b, name, 0.26, 0.42, name.Length > 9 ? 15 : 19, dim ? Tint(Empty, 0.6) : BitmapColor.White);
-            Band(b, bottom, 0.74, 0.18, 11, soft);
+            var soft = Soft(bg);
+            Head(b, Middle(top, 15), soft);
+            Centre(b, name, dim ? Faint : BitmapColor.White);
+            // While stepping, the footer is the countdown bar - a picture, so it gets the even cells.
+            if (ringed && DeckConfig.Ascii)
+            {
+                Art(b, bottom, 0.74, 0.18, Caption, soft);
+            }
+            else
+            {
+                Foot(b, bottom, soft);
+            }
+
             if (ringed)
             {
                 DrawFlash(b);
@@ -620,10 +678,10 @@ namespace Loupedeck.ClaudeDeckPlugin
             var h = b.Height;
             var bg = current ? Named(model.Color) : Shade(Named(model.Color), 0.55);
             b.Clear(bg);
-            Band(b, model.Label, 0.26, 0.40, model.Label.Length > 9 ? 15 : 19, current ? BitmapColor.White : Tint(bg, 0.75));
+            Centre(b, model.Label, current ? BitmapColor.White : Tint(bg, 0.75));
             if (current)
             {
-                Band(b, "in use", 0.72, 0.18, 11, Tint(bg, 0.85));
+                Foot(b, "in use", Soft(bg));
                 var barH = Math.Max(4, (Int32)(h * 0.05));
                 b.FillRectangle((Int32)(b.Width * 0.25), h - barH, (Int32)(b.Width * 0.5), barH, BitmapColor.White);
             }
@@ -644,7 +702,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             if (String.IsNullOrEmpty(colour))
             {
-                return BigNumberKey("–", label, Empty, size);
+                return BigNumberKey(Dash, label, Empty, size, Faint);
             }
 
             var bg = colour == "limit" ? Amber : ColourOf(colour);
@@ -653,7 +711,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 bg = Shade(bg, 0.5);
             }
 
-            return BigNumberKey(count.ToString(), label, bg, size);
+            return BigNumberKey(count.ToString(), label, bg, size, BitmapColor.White);
         }
 
         // The oldest open permission prompt, spelled out, so that pressing the key is an informed yes.
@@ -665,29 +723,30 @@ namespace Loupedeck.ClaudeDeckPlugin
             if (s == null)
             {
                 b.Clear(Empty);
-                DrawCentred(b, "✓", (Int32)(h * 0.42), (Int32)(h * 0.40), Tint(Empty, 0.35));
-                DrawCentred(b, "Allow", (Int32)(h * 0.84), Math.Max(10, (Int32)(h * 0.125)), Tint(Empty, 0.5));
+                DrawCentred(b, Ascii.Tick, (Int32)(h * 0.42), (Int32)(h * 0.40), Faint);
+                Foot(b, "allow", Muted);
                 return b.ToImage();
             }
 
             var bg = IsDimBeat(frame) ? Shade(Attention, 0.5) : Attention;
             b.Clear(bg);
-            var soft = Tint(bg, 0.82);
-            var head = waiting > 1 ? $"allow? (1/{waiting})" : "allow?";
-            Band(b, head, 0.03, 0.17, 11, soft);
+            var soft = Soft(bg);
+            Head(b, waiting > 1 ? $"allow? (1/{waiting})" : "allow?", soft);
             var body = s.Detail.Length > 0 ? $"{ToolName(s.Tool)}: {Wrappable(s.Detail)}" : Or(ToolName(s.Tool), "tool");
-            Band(b, End(body, 46), 0.20, 0.54, 13, BitmapColor.White);
-            Band(b, Middle(Or(s.Project, "—"), 15), 0.78, 0.18, 11, soft);
+            Band(b, End(body, 44), 0.20, 0.50, Body, BitmapColor.White);
+            Foot(b, Middle(Or(s.Project, "—"), 15), soft);
             return b.ToImage();
         }
 
         // A number that fills the key, with a word under it saying what is being counted.
-        private static BitmapImage BigNumberKey(String number, String caption, BitmapColor fill, PluginImageSize size)
+        private static BitmapImage BigNumberKey(String number, String caption, BitmapColor fill, PluginImageSize size, BitmapColor ink)
         {
             using var b = new BitmapBuilder(size);
             b.Clear(fill);
-            DrawCentred(b, number, (Int32)(b.Height * 0.43), (Int32)(b.Height * 0.45), BitmapColor.White);
-            DrawCentred(b, caption, (Int32)(b.Height * 0.85), Math.Max(10, b.Height / 8), Blend(fill, BitmapColor.White, 0.8));
+            // A dash the height of a digit is a white bar; it stands in at the size of a big number.
+            var pt = number == Dash ? Big : (Int32)(b.Height * 0.45);
+            DrawCentred(b, number, (Int32)(b.Height * 0.43), pt, ink);
+            Foot(b, caption, Soft(fill));
             return b.ToImage();
         }
 
@@ -704,7 +763,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static void DrawCentred(BitmapBuilder b, String text, Int32 row, Int32 fontSize, BitmapColor color)
         {
             var inkMiddle = (b.Height / 2.0) + BaselineBelowMiddle - (DigitHeightPerPoint * fontSize / 2.0);
-            b.DrawText(text, 0, (Int32)Math.Round(row - inkMiddle), b.Width, b.Height, color, fontSize);
+            b.DrawText(text, 0, (Int32)Math.Round(row - inkMiddle), b.Width, b.Height, color, fontSize, -1, -1, Face);
         }
 
         public static BitmapImage Dark(PluginImageSize size)
@@ -718,8 +777,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             using var b = new BitmapBuilder(size);
             b.Clear(Neutral);
-            Band(b, line, 0.18, 0.34, 14, BitmapColor.White);
-            Band(b, note, 0.54, 0.36, 10, Tint(Neutral, 0.6));
+            Band(b, line, 0.16, 0.34, WordSize(line), BitmapColor.White);
+            Band(b, note, 0.54, 0.36, Caption, Soft(Neutral));
             return b.ToImage();
         }
 
@@ -732,6 +791,17 @@ namespace Loupedeck.ClaudeDeckPlugin
         public static BitmapImage App(AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash, PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
+            return App(b, app, front, badgeState, badgeCount, flash);
+        }
+
+        public static BitmapImage App(AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash, Int32 width, Int32 height)
+        {
+            using var b = new BitmapBuilder(width, height);
+            return App(b, app, front, badgeState, badgeCount, flash);
+        }
+
+        private static BitmapImage App(BitmapBuilder b, AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash)
+        {
             var w = b.Width;
             var h = b.Height;
             var bg = front ? Neutral : Empty;
@@ -756,8 +826,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 b.FillRectangle(0, 0, w, h, new BitmapColor(Empty.R, Empty.G, Empty.B, 150));
             }
 
-            b.DrawText(Middle(app.Name, 15), 2, (Int32)(h * 0.66), w - 4, (Int32)(h * 0.22),
-                app.Hidden && !front ? Tint(Empty, 0.45) : BitmapColor.White, 11);
+            Band(b, Middle(app.Name, 15), 0.66, 0.22, Caption, app.Hidden && !front ? Muted : BitmapColor.White);
 
             if (front)
             {
@@ -773,7 +842,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 b.FillCircle(cx, cy, r + 2, bg);
                 b.FillCircle(cx, cy, r, ColourOf(badgeState));
                 var fs = (Int32)(r * 1.3);
-                b.DrawText(badgeCount > 9 ? "9+" : badgeCount.ToString(), cx - r, cy - r + 1, r * 2, r * 2, BitmapColor.White, badgeCount > 9 ? fs - 3 : fs);
+                b.DrawText(badgeCount > 9 ? "9+" : badgeCount.ToString(), cx - r, cy - r + 1, r * 2, r * 2, BitmapColor.White, badgeCount > 9 ? fs - 3 : fs, -1, -1, Face);
             }
 
             if (flash)
@@ -789,7 +858,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             using var b = new BitmapBuilder(width, height);
             b.Clear(Empty);
-            b.DrawText(name, 2, (Int32)(height * 0.28), width - 4, (Int32)(height * 0.44), Tint(Empty, 0.6), 14);
+            Centre(b, name, Muted);
             return b.ToImage();
         }
 
@@ -845,15 +914,22 @@ namespace Loupedeck.ClaudeDeckPlugin
             return "";
         }
 
-        // Character-frame animation. Every glyph here was rendered and looked at first, because the key
-        // font is particular: half-circles, dots, diamonds, a tick, right-pointing arrows and the block
-        // elements are in it; the middle dot, left-pointing triangles and solid stars are not.
+        // The marks, and the character-frame animation. Every glyph here was rendered and looked at
+        // first, because the key font is particular: half-circles, dots, diamonds, a tick, the
+        // multiplication cross, single angle quotes, arrows and the block elements are in it; the
+        // heavy crosses (✕ ✗ ✖), solid stars and the four-pointed sparkle are not.
         public static class Ascii
         {
-            // A half-filled circle, turning. Like everything that shares a string with words, these come
-            // from the key's main font: the renderer uses ONE typeface per string, and a glyph it has to
-            // fetch from a symbol font (a star, braille) drags the whole string there - where there
-            // are no letters, so the words come out as boxes.
+            // One mark per state, used by both styles. Like everything that shares a string with
+            // words, these come from the key's main font: the renderer uses ONE typeface per string,
+            // and a glyph it has to fetch from a symbol font (a star, braille) drags the whole string
+            // there - where there are no letters, so the words come out as boxes.
+            public const String Tick = "✓";
+            public const String Cross = "×";
+            public const String Bang = "!";
+            public const String Up = "‹";
+
+            // A half-filled circle, turning.
             private static readonly String[] Turning = { "◐", "◓", "◑", "◒" };
 
             private static readonly String[] Twinkle = { "◇", "◆" };
@@ -875,16 +951,16 @@ namespace Loupedeck.ClaudeDeckPlugin
                         return $"{Turning[frame % Turning.Length]} {words}";
 
                     case "done":
-                        return $"{(justFinished ? Twinkle[frame % Twinkle.Length] : "✓")} {words}";
+                        return $"{(justFinished ? Twinkle[frame % Twinkle.Length] : Tick)} {words}";
 
                     case "error":
-                        return $"x {words}";
+                        return $"{Cross} {words}";
 
                     case "attention":
                         // A long question has no room for the run-up; it keeps a plain mark instead.
                         if (words.Length > 12)
                         {
-                            return $"! {words}";
+                            return $"{Bang} {words}";
                         }
 
                         return (frame % 3) switch
@@ -914,8 +990,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
 
             // A bar that empties over the time a tap-to-step key waits before it commits. Spent cells
-            // are drawn, not left blank: the key font is proportional and squeezes runs of spaces, so
-            // a bar made with them would shrink instead of emptying.
+            // are drawn, not left blank, so the bar keeps its length whichever face draws it.
             public static String Countdown(Double remaining, Int32 cells = 6)
             {
                 var full = (Int32)Math.Ceiling(Math.Clamp(remaining, 0, 1) * cells);
@@ -930,12 +1005,19 @@ namespace Loupedeck.ClaudeDeckPlugin
         // Every tile is laid out as horizontal bands: a line of text occupies the stretch of the key
         // between two fractions of its height (0 = top edge, 1 = bottom), a few pixels in from the
         // sides. `nudge` moves a band down by whole pixels, for tiles with a gauge above their text.
-        private static void Band(BitmapBuilder b, String text, Double from, Double height, Int32 fontSize, BitmapColor color, Int32 nudge = 0)
+        private static void Band(BitmapBuilder b, String text, Double from, Double height, Int32 fontSize, BitmapColor color, Int32 nudge = 0, String face = Face)
         {
             const Int32 Margin = 3;
             b.DrawText(text ?? "", Margin, nudge + (Int32)Math.Round(b.Height * from), b.Width - (2 * Margin),
-                (Int32)Math.Round(b.Height * height), color, fontSize);
+                (Int32)Math.Round(b.Height * height), color, fontSize, -1, -1, face);
         }
+
+        // A band of ASCII art, in the face whose cells are all one width.
+        private static void Art(BitmapBuilder b, String text, Double from, Double height, Int32 fontSize, BitmapColor color) =>
+            Band(b, text, from, height, fontSize, color, 0, Mono);
+
+        // What stands where a number would go when there is none.
+        private const String Dash = "–";
 
         // All the colour arithmetic there is: a point part of the way from one colour to another.
         // Towards white lightens, towards black darkens.
