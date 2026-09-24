@@ -102,6 +102,8 @@ namespace Loupedeck.ClaudeDeckPlugin
             });
         }
 
+        public override LibraryImage GetButtonLibraryImage() => new("Models.svg");
+
         public override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)
         {
             var session = Deck.ModelTarget;

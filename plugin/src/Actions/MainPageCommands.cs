@@ -16,7 +16,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
         }
 
-        protected override Boolean Pulses => Urgency.Tiers()[0].Sessions.Count > 0;
+        protected override String Icon => "Overview";
+
+        // Blocked sessions blink and working ones breathe: either keeps the key moving.
+        protected override Boolean Pulses => Urgency.Tiers()[0].Sessions.Count > 0 || (DeckConfig.Ascii && Urgency.Working().Count > 0);
 
         protected override IReadOnlyList<SessionInfo> Walk() => Urgency.Queue();
 
@@ -35,6 +38,8 @@ namespace Loupedeck.ClaudeDeckPlugin
             : base("Next", "The Claude session that most needs you, shown in full; press to go to it")
         {
         }
+
+        protected override String Icon => "Next";
 
         protected override Boolean Pulses => Urgency.Tiers()[0].Sessions.Count > 0;
 
@@ -80,6 +85,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         private volatile String _held;
         private volatile String _flash;
         private String _drawn = "";
+
+        protected override LibraryImage GetCommandLibraryImage(String actionParameter) => new("Slot.svg");
 
         public SessionSlotCommand()
             : base((DeviceType)DeviceTypeAliases.MxCreativeKeypad)

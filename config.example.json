@@ -73,6 +73,9 @@
   //           trailing space and no submit lets you add your own instructions before sending
   //   key     "escape" interrupts instead of typing
   //   color   "green" | "amber" | "red" | "coral" | "purple" | "blue" | "violet", default neutral
+  //   icon    drawn above the label. Left out, the key gets one for what it does (Escape, Compact,
+  //           Clear, Continue, else Send); "none" is a bare label; or any name from
+  //           plugin/src/package/actionicons - Allow, Apps, Models, Sessions, Usage, OpenApp, ...
   //   id      optional name of your choosing. A key you have placed from "Commands" in Options+ is
   //           remembered by its id, or without one by what it does - so relabelling never unbinds it,
   //           and with an id you can even change what it types

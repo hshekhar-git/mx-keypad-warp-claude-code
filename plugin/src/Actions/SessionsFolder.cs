@@ -72,6 +72,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         // The key that opens the folder, on whatever page it is placed.
         public override BitmapImage GetButtonImage(PluginImageSize imageSize) => TileRenderer.SessionsFolder(imageSize);
 
+        public override LibraryImage GetButtonLibraryImage() => new("Sessions.svg");
+
         public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
 
         public override Boolean Activate()
@@ -571,7 +573,8 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             if (Index(actionParameter, "p:k:") is { } k && k < DeckConfig.Keys.Count)
             {
-                return TileRenderer.Command(DeckConfig.Keys[k].Label, DeckConfig.Keys[k].Color, flash, imageSize);
+                var key = DeckConfig.Keys[k];
+                return TileRenderer.Command(key.Label, key.Color, flash, imageSize, TileRenderer.IconFor(key));
             }
 
             return TileRenderer.Dark(imageSize);

@@ -41,6 +41,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         protected override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize) =>
             TileRenderer.UsageKey(Int32.TryParse(actionParameter, out var i) ? i : 0, imageSize);
 
+        protected override LibraryImage GetCommandLibraryImage(String actionParameter) => new("Usage.svg");
+
         protected override String GetCommandDisplayName(String actionParameter, PluginImageSize imageSize) => "";
     }
 }

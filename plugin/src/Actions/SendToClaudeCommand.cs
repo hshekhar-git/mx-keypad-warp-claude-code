@@ -53,8 +53,11 @@ namespace Loupedeck.ClaudeDeckPlugin
             return anythingToSend && Deck.Send(key, actionParameters.GetBoolean(Field.Forward, false));
         }
 
-        protected override BitmapImage GetCommandImage(ActionEditorActionParameters actionParameters, Int32 imageWidth, Int32 imageHeight) =>
-            TileRenderer.Command(Read(actionParameters).Label, null, imageWidth, imageHeight);
+        protected override BitmapImage GetCommandImage(ActionEditorActionParameters actionParameters, Int32 imageWidth, Int32 imageHeight)
+        {
+            var key = Read(actionParameters);
+            return TileRenderer.Command(key.Label, null, imageWidth, imageHeight, TileRenderer.IconFor(key));
+        }
 
         protected override String GetCommandDisplayName(ActionEditorActionParameters actionParameters) => "";
     }

@@ -23,6 +23,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         // Optional tile colour: "green", "amber", "red", or empty for neutral.
         public String Color { get; init; } = "";
 
+        // Optional icon: a name from the plugin's actionicons folder, "none" for a bare label, or
+        // empty to get one for what the key does (see TileRenderer.IconFor).
+        public String Icon { get; init; } = "";
+
         // "key": "escape" (or "esc") sends the Escape key instead of typing anything.
         public Boolean IsEscape => this.Key.Trim().ToLowerInvariant() is "escape" or "esc";
     }
@@ -389,7 +393,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                             lbl = text.Trim().Length > 0 ? text.Trim() : (key.Length > 0 ? key : "return");
                         }
 
-                        list.Add(new KeyDef { Id = Str(k, "id"), Label = lbl, Text = text, Key = key, Submit = submit, Color = Str(k, "color") });
+                        list.Add(new KeyDef { Id = Str(k, "id"), Label = lbl, Text = text, Key = key, Submit = submit, Color = Str(k, "color"), Icon = Str(k, "icon").Trim() });
                     }
 
                     s.Keys = list;

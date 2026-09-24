@@ -18,6 +18,7 @@ Directory.CreateDirectory root |> ignore
 
 let size = PluginImageSize.Width116
 let now = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+TileRenderer.IconDir <- Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "..", "plugin", "src", "package", "actionicons"))
 
 // ---- a cast of sessions, with made-up names ---------------------------------------------------
 let session project title state kind tool detail ctx sinceSecs =
@@ -127,8 +128,8 @@ save "page" [
     model.Render(web, false, size)
     effort.Render(web, false, size)
     mode.Render(web, false, size)
-    TileRenderer.Command("esc", null, false, size)
-    TileRenderer.Command("/compact", null, false, size) ]
+    TileRenderer.Command("esc", null, false, size, "Escape")
+    TileRenderer.Command("/compact", null, false, size, "Compact") ]
 
 
 // 6  a blocked session's page: the answers come first
@@ -173,8 +174,8 @@ save "step" [
     model.Render(docs, false, size)
     TileRenderer.Model("effort ~2.8x", "xhigh", TileRenderer.Ascii.Countdown 0.6, "coral", true, false, size)
     mode.Render(docs, false, size)
-    TileRenderer.Command("esc", null, false, size)
-    TileRenderer.Command("/compact", null, false, size) ]
+    TileRenderer.Command("esc", null, false, size, "Escape")
+    TileRenderer.Command("/compact", null, false, size, "Compact") ]
 
 // 9  the app switcher
 save "apps" [

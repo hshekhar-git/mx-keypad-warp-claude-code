@@ -33,10 +33,12 @@ namespace Loupedeck.ClaudeDeckPlugin
         // ---- type ---------------------------------------------------------------------------
         //
         // One face at four sizes. Every line on every key is one of these, so keys sitting next to
-        // each other agree about what a caption is.
-        private const String Face = "Brown Logitech Pan Light";
-        private const Int32 Caption = 11;   // the header and footer of a key, and any aside
-        private const Int32 Body = 13;      // a sentence: what a session is doing, a wrapped label
+        // each other agree about what a caption is. Of the faces the host bundles, Lexend is the one
+        // drawn for legibility: at caption size on a key read from arm's length it is the difference
+        // between a word and a smudge. The status marks were checked beside words in it.
+        private const String Face = "Lexend";
+        private const Int32 Caption = 12;   // the header and footer of a key, and any aside
+        private const Int32 Body = 14;      // a sentence: what a session is doing, a wrapped label
         private const Int32 Word = 19;      // one word that is the key: a command, a model, a level
         private const Int32 Big = 22;       // one number that is the key
 
@@ -73,6 +75,12 @@ namespace Loupedeck.ClaudeDeckPlugin
         // A blink is half a second bright, half a second dim: two ticks each way.
         private static Boolean IsDimBeat(Int32 frame) => (frame & 2) != 0;
 
+        // A working tile breathes: its colour swells and settles over two seconds, the way a thing
+        // that is alive does. 0 at rest, 1 at the top of the breath.
+        private static Double Breath(Int32 frame) => (1 - Math.Cos(frame * Math.PI / 4)) / 2;
+
+        private static BitmapColor Breathing(BitmapColor bg, Int32 frame) => Tint(bg, 0.14 * Breath(frame));
+
         // How long a tile celebrates a finished turn before settling down.
         private const Int64 SparkleSeconds = 3;
 
@@ -93,6 +101,10 @@ namespace Loupedeck.ClaudeDeckPlugin
             if (s.State == "attention" && IsDimBeat(frame))
             {
                 bg = Shade(bg, 0.5);
+            }
+            else if (s.State == "busy" && DeckConfig.Ascii)
+            {
+                bg = Breathing(bg, frame);
             }
 
             using var b = new BitmapBuilder(size);
@@ -271,26 +283,32 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         // ---- command keys -------------------------------------------------------------------
 
-        public static BitmapImage Command(String label, String color, Boolean flash, PluginImageSize size)
+        public static BitmapImage Command(String label, String color, Boolean flash, PluginImageSize size, String icon = null)
         {
             using var b = new BitmapBuilder(size);
-            return Command(b, label, color, flash);
+            return Command(b, label, color, flash, icon);
         }
 
-        public static BitmapImage Command(String label, String color, Int32 width, Int32 height)
+        public static BitmapImage Command(String label, String color, Int32 width, Int32 height, String icon = null)
         {
             using var b = new BitmapBuilder(width, height);
-            return Command(b, label, color, false);
+            return Command(b, label, color, false, icon);
         }
 
-        private static BitmapImage Command(BitmapBuilder b, String label, String color, Boolean flash)
+        private static BitmapImage Command(BitmapBuilder b, String label, String color, Boolean flash, String icon)
         {
             var bg = Named(color);
+            var h = b.Height;
             b.Clear(bg);
             // Answer keys carry whole option labels, so long text wraps in a taller box at body size.
             if (label.Length > 10)
             {
                 Band(b, End(label, 40), 0.10, 0.80, Body, BitmapColor.White);
+            }
+            // A key with an icon: the picture above, the word below.
+            else if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.38), (Int32)(h * 0.38), BitmapColor.White))
+            {
+                Band(b, label, 0.62, 0.26, label.Length > 7 ? 13 : 15, BitmapColor.White);
             }
             else
             {
@@ -495,6 +513,10 @@ namespace Loupedeck.ClaudeDeckPlugin
                 if (s.State == "attention" && IsDimBeat(frame))
                 {
                     c = Shade(c, 0.55);
+                }
+                else if (s.State == "busy" && DeckConfig.Ascii)
+                {
+                    c = Breathing(c, frame);
                 }
 
                 if (s.Key == targetKey)
@@ -723,7 +745,11 @@ namespace Loupedeck.ClaudeDeckPlugin
             if (s == null)
             {
                 b.Clear(Empty);
-                DrawCentred(b, Ascii.Tick, (Int32)(h * 0.42), (Int32)(h * 0.40), Faint);
+                if (!Icon(b, "Allow", w / 2, (Int32)(h * 0.42), (Int32)(h * 0.44), Faint))
+                {
+                    DrawCentred(b, Ascii.Tick, (Int32)(h * 0.42), (Int32)(h * 0.40), Faint);
+                }
+
                 Foot(b, "allow", Muted);
                 return b.ToImage();
             }
@@ -780,6 +806,91 @@ namespace Loupedeck.ClaudeDeckPlugin
             Band(b, line, 0.16, 0.34, WordSize(line), BitmapColor.White);
             Band(b, note, 0.54, 0.36, Caption, Soft(Neutral));
             return b.ToImage();
+        }
+
+        // ---- icons --------------------------------------------------------------------------
+        //
+        // Line icons in the style of the Logi icon packs - 32 on a side, two-pixel strokes, light
+        // grey - shipped as SVG in the plugin's actionicons folder. Options+ shows them in its
+        // action list; the keys draw them too, recoloured for the tile they sit on.
+
+        public static String IconDir { get; set; } = "";
+
+        // The colour the files are drawn in; swapped for the tile's ink before drawing.
+        private const String IconInk = "#E2E2E2";
+
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<String, Byte[]> IconCache = new();
+
+        // The icon a command key shows: the one it is configured with, else one for what it does.
+        // "none" asks for a bare label.
+        public static String IconFor(KeyDef key)
+        {
+            if (key == null)
+            {
+                return null;
+            }
+
+            if (key.Icon.Length > 0)
+            {
+                return key.Icon.Equals("none", StringComparison.OrdinalIgnoreCase) ? null : key.Icon;
+            }
+
+            if (key.Key.Equals("escape", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Escape";
+            }
+
+            var text = key.Text.Trim();
+            return text.StartsWith("/compact", StringComparison.OrdinalIgnoreCase) ? "Compact"
+                : text.StartsWith("/clear", StringComparison.OrdinalIgnoreCase) ? "Clear"
+                : text.Equals("continue", StringComparison.OrdinalIgnoreCase) ? "Continue"
+                : "Send";
+        }
+
+        // Draws an icon centred on (cx, cy), `size` on a side. False when there is no such icon,
+        // so the caller can fall back to a glyph.
+        private static Boolean Icon(BitmapBuilder b, String name, Int32 cx, Int32 cy, Int32 size, BitmapColor ink)
+        {
+            if (String.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+
+            var key = $"{name}|{ink.R:X2}{ink.G:X2}{ink.B:X2}";
+            if (!IconCache.TryGetValue(key, out var bytes))
+            {
+                bytes = null;
+                try
+                {
+                    var path = System.IO.Path.Combine(IconDir, name + ".svg");
+                    if (System.IO.File.Exists(path))
+                    {
+                        var svg = System.IO.File.ReadAllText(path).Replace(IconInk, $"#{ink.R:X2}{ink.G:X2}{ink.B:X2}", StringComparison.OrdinalIgnoreCase);
+                        bytes = System.Text.Encoding.UTF8.GetBytes(svg);
+                    }
+                }
+                catch
+                {
+                    // No icon is a plain key, not a broken one.
+                }
+
+                IconCache[key] = bytes;
+            }
+
+            if (bytes == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                b.DrawImage(bytes, cx - (size / 2), cy - (size / 2), size, size, BitmapRotation.None);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // ---- folder buttons -----------------------------------------------------------------

@@ -11,6 +11,7 @@ let out = if fsi.CommandLineArgs.Length > 1 then fsi.CommandLineArgs.[1] else "p
 Directory.CreateDirectory out |> ignore
 let now = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
 let size = PluginImageSize.Width116
+TileRenderer.IconDir <- Path.GetFullPath(Path.Combine(__SOURCE_DIRECTORY__, "..", "plugin", "src", "package", "actionicons"))
 let save (name: string) (img: BitmapImage) = File.WriteAllBytes(Path.Combine(out, name + ".png"), img.ToArray())
 
 let mk state kind tool detail title fill =

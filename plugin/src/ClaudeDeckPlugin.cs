@@ -41,6 +41,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             AppWatcher.HelperDir = Path.GetDirectoryName(this.AssemblyFilePath);
             AppWatcher.Instance.EnsureStarted();
 
+            // The plugin folder is the DLL's grandparent: bin/ClaudeDeckPlugin.dll beside actionicons/.
+            TileRenderer.IconDir = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(this.AssemblyFilePath)) ?? "", "actionicons");
+
             // Not cheap - reading session files, querying Warp's database, tailing transcripts - and
             // the host unloads a plugin whose Load() takes too long. So the rest happens behind it.
             Task.Run(this.StartSessions);
