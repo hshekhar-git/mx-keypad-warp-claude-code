@@ -53,8 +53,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         // A word shrinks rather than wraps: "ultracode" and "Fable 5.1" stay on one line.
         private static Int32 WordSize(String word) => (word ?? "").Length > 8 ? 16 : Word;
 
-        // The name under an icon.
-        private static Int32 LabelSize(String label) => (label ?? "").Length > 7 ? 14 : 16;
+        // The name under an icon: one size on every such key, so keys side by side match.
+        private const Int32 Label = 15;
 
         // A caption is one line; a long one gives up a point or two rather than wrap off the key.
         private static Int32 CaptionSize(String text) =>
@@ -319,7 +319,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             // A key with an icon: the picture above, the word below.
             else if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.37), (Int32)(h * 0.44), BitmapColor.White))
             {
-                Band(b, label, 0.64, 0.28, LabelSize(label), BitmapColor.White);
+                Band(b, label, 0.64, 0.28, Label, BitmapColor.White);
             }
             else
             {
@@ -932,53 +932,15 @@ namespace Loupedeck.ClaudeDeckPlugin
             using var b = new BitmapBuilder(size);
             var h = b.Height;
             b.Clear(Empty);
-            if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.37), (Int32)(h * 0.46), BitmapColor.White))
+            if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.37), (Int32)(h * 0.44), BitmapColor.White))
             {
-                Band(b, label, 0.64, 0.28, LabelSize(label), BitmapColor.White);
+                Band(b, label, 0.64, 0.28, Label, BitmapColor.White);
             }
             else
             {
                 Centre(b, label, BitmapColor.White);
             }
 
-            return b.ToImage();
-        }
-
-        // App Switcher: the first four apps of the switcher, as a 2x2 of their icons - the same
-        // pinned-then-recent order the folder opens with. Without the helper, four quiet squares.
-        public static BitmapImage AppsFolder(IReadOnlyList<AppInfo> first, PluginImageSize size)
-        {
-            using var b = new BitmapBuilder(size);
-            var w = b.Width;
-            var h = b.Height;
-            b.Clear(Empty);
-
-            var cell = (Int32)(w * 0.32);
-            var gap = Math.Max(3, (Int32)(w * 0.05));
-            var grid = (2 * cell) + gap;
-            var x0 = (w - grid) / 2;
-            var y0 = (Int32)(h * 0.05);
-            for (var i = 0; i < 4; i++)
-            {
-                var x = x0 + ((i % 2) * (cell + gap));
-                var y = y0 + ((i / 2) * (cell + gap));
-                var app = i < first.Count ? first[i] : null;
-                var icon = app != null ? IconBytes(app.Icon) : null;
-                if (icon != null)
-                {
-                    b.DrawImage(icon, x, y, cell, cell, BitmapRotation.None);
-                }
-                else
-                {
-                    b.FillRectangle(x, y, cell, cell, Tint(Empty, 0.12));
-                    if (app != null)
-                    {
-                        DrawCentred(b, Initial(app.Name), y + (cell / 2), (Int32)(cell * 0.6), Bright);
-                    }
-                }
-            }
-
-            Foot(b, "Apps", Bright);
             return b.ToImage();
         }
 

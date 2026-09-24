@@ -45,8 +45,6 @@ let calm    = ResizeArray [ web; docs; infra; mobile ]            // nobody bloc
 // machine that has never run the plugin.
 let icons = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "deck", "icons")
 let app name bundle hidden = AppInfo(Pid = 1, Name = name, Bundle = bundle, Hidden = hidden, Icon = Path.Combine(icons, bundle + ".png"))
-let frontApps = [ app "Warp" "dev.warp.Warp-Stable" false; app "Code" "com.microsoft.VSCode" false
-                  app "Google Chrome" "com.google.Chrome" false; app "Figma" "com.figma.Desktop" false ]
 
 // ---- keys the host draws itself, approximated -------------------------------------------------
 let back () =
@@ -99,7 +97,7 @@ save "main" [
     tile infra false 2
     TileRenderer.FolderKey("Sessions", "Sessions", size)
     TileRenderer.Allow(api, 1, size, 0)
-    TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
+    TileRenderer.FolderKey("Apps", "Apps", size) ]
 
 // 3  the same page with nobody waiting
 save "calm" [
@@ -111,7 +109,7 @@ save "calm" [
     tile mobile false 0
     TileRenderer.FolderKey("Sessions", "Sessions", size)
     TileRenderer.Allow(null, 0, size, 0)
-    TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
+    TileRenderer.FolderKey("Apps", "Apps", size) ]
 
 // 4  inside Sessions: five sessions over the usage row
 save "list" [ back (); tile web true 0; tile api false 0; tile docs false 0; tile infra false 3; tile mobile false 0; usage 0; usage 1; usage 2 ]
