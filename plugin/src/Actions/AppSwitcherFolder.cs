@@ -88,7 +88,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             this._open = true;
             this._frozenOrder = Order(Watcher.Apps, Watcher.Recent);
             Watcher.Changed += this.OnAppsChanged;
-            SessionStore.Instance.Changed += this.OnSessionsChanged;
             return base.Activate();
         }
 
@@ -97,7 +96,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             this._open = false;
             this._frozenOrder = null;
             Watcher.Changed -= this.OnAppsChanged;
-            SessionStore.Instance.Changed -= this.OnSessionsChanged;
             return base.Deactivate();
         }
 
@@ -163,8 +161,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             this.ButtonActionNamesChanged();
             this.RepaintAll();
         }
-
-        private void OnSessionsChanged(Object sender, EventArgs e) => this.RepaintAll();
 
         private void RepaintAll()
         {
@@ -278,8 +274,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return TileRenderer.Dark(imageSize);
             }
 
-            var (state, count) = Apps.Badge(app.Bundle);
-            return TileRenderer.App(app, Watcher.Front == app.Bundle, state, count, this._flash == actionParameter, imageSize);
+            return TileRenderer.App(app, Watcher.Front == app.Bundle, this._flash == actionParameter, imageSize);
         }
 
         public override String GetCommandDisplayName(String actionParameter, PluginImageSize imageSize) => "";

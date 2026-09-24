@@ -180,14 +180,14 @@ save "step" [
 // 9  the app switcher
 save "apps" [
     back ()
-    TileRenderer.App(app "Warp" "dev.warp.Warp-Stable" false, false, "attention", 1, false, size)
-    TileRenderer.App(app "Code" "com.microsoft.VSCode" false, true, "", 0, false, size)
-    TileRenderer.App(app "Google Chrome" "com.google.Chrome" false, false, "", 0, false, size)
-    TileRenderer.App(app "Figma" "com.figma.Desktop" false, false, "", 0, false, size)
-    TileRenderer.App(app "Finder" "com.apple.finder" false, false, "", 0, false, size)
-    TileRenderer.App(app "Music" "com.apple.Music" true, false, "", 0, false, size)
-    TileRenderer.App(app "Calendar" "com.apple.iCal" false, false, "", 0, false, size)
-    TileRenderer.App(app "Preview" "com.apple.Preview" false, false, "", 0, false, size) ]
+    TileRenderer.App(app "Warp" "dev.warp.Warp-Stable" false, false, false, size)
+    TileRenderer.App(app "Code" "com.microsoft.VSCode" false, true, false, size)
+    TileRenderer.App(app "Google Chrome" "com.google.Chrome" false, false, false, size)
+    TileRenderer.App(app "Figma" "com.figma.Desktop" false, false, false, size)
+    TileRenderer.App(app "Finder" "com.apple.finder" false, false, false, size)
+    TileRenderer.App(app "Music" "com.apple.Music" true, false, false, size)
+    TileRenderer.App(app "Calendar" "com.apple.iCal" false, false, false, size)
+    TileRenderer.App(app "Preview" "com.apple.Preview" false, false, false, size) ]
 
 UsageStore.Shutdown()
 DeckConfig.Shutdown()

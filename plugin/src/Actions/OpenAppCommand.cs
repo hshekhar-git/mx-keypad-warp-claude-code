@@ -3,8 +3,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System;
 
     // One key, one app: switches straight to it (launching it if need be) without going through the
-    // switcher. On a terminal it doubles as a status light - the badge shows what your Claude
-    // sessions there are up to.
+    // switcher.
     public class OpenAppCommand : ActionEditorCommand
     {
         private const String AppName = "app";
@@ -15,7 +14,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             : base((DeviceType)DeviceTypeAliases.MxCreativeKeypad)
         {
             this.DisplayName = "Open App";
-            this.Description = "Switches to one app, showing its icon and a Claude session badge";
+            this.Description = "Switches to one app, showing its icon";
             this.GroupName = "Apps";
             this.IsWidget = true;
 
@@ -27,7 +26,6 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
             this._onChanged = (_, _) => this.ActionImageChanged();
             AppWatcher.Instance.Changed += this._onChanged;
-            SessionStore.Instance.Changed += this._onChanged;
             return true;
         }
 
@@ -43,8 +41,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return TileRenderer.AppPlaceholder(name.Length > 0 ? name : "app", imageWidth, imageHeight);
             }
 
-            var (state, count) = Apps.Badge(app.Bundle);
-            return TileRenderer.App(app, AppWatcher.Instance.Front == app.Bundle, state, count, false, imageWidth, imageHeight);
+            return TileRenderer.App(app, AppWatcher.Instance.Front == app.Bundle, false, imageWidth, imageHeight);
         }
 
         protected override String GetCommandDisplayName(ActionEditorActionParameters actionParameters) => "";

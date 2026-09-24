@@ -52,26 +52,5 @@ namespace Loupedeck.ClaudeDeckPlugin
             AppWatcher.Instance.Apps.FirstOrDefault(a =>
                 String.Equals(a.Bundle, idOrName, StringComparison.OrdinalIgnoreCase)
                 || String.Equals(a.Name, idOrName, StringComparison.OrdinalIgnoreCase));
-
-        // The most urgent thing happening among the Claude sessions an app hosts, and how many.
-        public static (String State, Int32 Count) Badge(String bundle)
-        {
-            if (String.IsNullOrEmpty(bundle))
-            {
-                return ("", 0);
-            }
-
-            var sessions = SessionStore.Instance.All.Where(s => s.Bundle == bundle).ToList();
-            foreach (var state in new[] { "attention", "error", "done", "busy" })
-            {
-                var n = sessions.Count(s => s.State == state);
-                if (n > 0)
-                {
-                    return (state, n);
-                }
-            }
-
-            return ("", 0);
-        }
     }
 }

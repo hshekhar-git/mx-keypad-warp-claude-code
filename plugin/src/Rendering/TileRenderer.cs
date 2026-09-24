@@ -987,21 +987,20 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<String, Byte[]> Icons = new();
 
         // An app: its icon, filling the key - the icon IS the name - a bar underneath when it is the
-        // one in front, dimmed when it is hidden, and, for a terminal hosting Claude sessions, a
-        // badge in the deck's own colours. Only an app without an icon gets a letter.
-        public static BitmapImage App(AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash, PluginImageSize size)
+        // one in front, dimmed when it is hidden. Only an app without an icon gets a letter.
+        public static BitmapImage App(AppInfo app, Boolean front, Boolean flash, PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
-            return App(b, app, front, badgeState, badgeCount, flash);
+            return App(b, app, front, flash);
         }
 
-        public static BitmapImage App(AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash, Int32 width, Int32 height)
+        public static BitmapImage App(AppInfo app, Boolean front, Boolean flash, Int32 width, Int32 height)
         {
             using var b = new BitmapBuilder(width, height);
-            return App(b, app, front, badgeState, badgeCount, flash);
+            return App(b, app, front, flash);
         }
 
-        private static BitmapImage App(BitmapBuilder b, AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash)
+        private static BitmapImage App(BitmapBuilder b, AppInfo app, Boolean front, Boolean flash)
         {
             var w = b.Width;
             var h = b.Height;
@@ -1033,17 +1032,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 var barH = Math.Max(4, (Int32)(h * 0.05));
                 b.FillRectangle((Int32)(w * 0.25), h - barH, (Int32)(w * 0.5), barH, BitmapColor.White);
-            }
-
-            if (badgeCount > 0)
-            {
-                var r = (Int32)(w * 0.13);
-                var cx = w - r - 4;
-                var cy = r + 4;
-                b.FillCircle(cx, cy, r + 2, bg);
-                b.FillCircle(cx, cy, r, ColourOf(badgeState));
-                var fs = (Int32)(r * 1.3);
-                b.DrawText(badgeCount > 9 ? "9+" : badgeCount.ToString(), cx - r, cy - r + 1, r * 2, r * 2, BitmapColor.White, badgeCount > 9 ? fs - 3 : fs, -1, -1, Face);
             }
 
             if (flash)

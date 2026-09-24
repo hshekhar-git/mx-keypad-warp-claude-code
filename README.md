@@ -29,7 +29,7 @@ Every tile below was drawn by the plugin's own renderer (`tools/make-steps.sh` r
 | <img src="docs/steps/03-main.png" alt="Step 3: the main page with one session blocked."> | <img src="docs/steps/04-calm.png" alt="The main page when nothing needs you."> |
 | <img src="docs/steps/05-list.png" alt="Step 4: the sessions list, five sessions above the usage row."> | <img src="docs/steps/06-page.png" alt="Step 5: one session's page with info, model, effort and mode; the model key shows that model's weekly usage."> |
 | <img src="docs/steps/07-answer.png" alt="Step 6: a blocked session's page with yes, always and no keys."> | <img src="docs/steps/08-question.png" alt="A multiple-choice question with the real options on the keys."> |
-| <img src="docs/steps/09-step.png" alt="Step 7: tap to step, with a countdown bar."> | <img src="docs/steps/10-apps.png" alt="Step 8: the app switcher with icons and a session badge."> |
+| <img src="docs/steps/09-step.png" alt="Step 7: tap to step, with a countdown bar."> | <img src="docs/steps/10-apps.png" alt="Step 8: the app switcher, every running app as its icon."> |
 
 ## The main page
 
@@ -234,10 +234,8 @@ its real icon. Press one and it comes to the front, and the folder closes itself
   perfectly sorted list. Everything else is most-recently-used, like Cmd-Tab.
 - The order is **frozen while the folder is open**, so tiles do not shuffle under your finger.
 - The app in front has a white bar; hidden apps are dimmed; **hold** a key to hide that app.
-- A terminal hosting Claude sessions wears a **badge in the deck's colours** - red 2 means two sessions
-  there are blocked on you - so the switcher tells you *why* to go to Warp, not just how.
 - **Open App** is the one-key version: set it to "Warp" in its Options+ form and it is a direct
-  switch-to-Warp key with the same icon and badge.
+  switch-to-Warp key with the same icon.
 
 Driven by a small native helper (`helper/deck-apps.swift`) that pushes a line when an app launches,
 quits, activates or hides - nothing polls - and exits by itself when the plugin goes away.
