@@ -40,8 +40,6 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
 
-        public override LibraryImage GetButtonLibraryImage() => new("Apps.svg");
-
         public override Boolean Activate()
         {
             this._open = true;

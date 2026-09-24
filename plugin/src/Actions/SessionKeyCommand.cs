@@ -138,11 +138,6 @@ namespace Loupedeck.ClaudeDeckPlugin
         protected override void RunCommand(String actionParameter) => Deck.Focus(this._rotation.Advance(this.Walk()));
 
         protected override String GetCommandDisplayName(String actionParameter, PluginImageSize imageSize) => "";
-
-        // The key's icon in the Options+ action list: a file in the plugin's actionicons folder.
-        protected abstract String Icon { get; }
-
-        protected override LibraryImage GetCommandLibraryImage(String actionParameter) => new(this.Icon + ".svg");
     }
 
     // How many sessions want you, as one number: the size of the most urgent tier that has anyone in
@@ -155,8 +150,6 @@ namespace Loupedeck.ClaudeDeckPlugin
         }
 
         private static Tier Top() => Urgency.Tiers().FirstOrDefault(t => t.Sessions.Count > 0);
-
-        protected override String Icon => "NeedsMe";
 
         protected override Boolean Pulses => Top()?.Colour == "attention";
 
@@ -190,8 +183,6 @@ namespace Loupedeck.ClaudeDeckPlugin
         {
         }
 
-        protected override String Icon => "Working";
-
         protected override IReadOnlyList<SessionInfo> Walk() => Urgency.Working();
 
         protected override String Fingerprint() => Urgency.Working().Count.ToString();
@@ -214,8 +205,6 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static List<SessionInfo> Prompts() =>
             Urgency.Tiers()[0].Sessions.Where(s => s.NeedsPermission).ToList();
-
-        protected override String Icon => "Allow";
 
         protected override Boolean Pulses => Prompts().Count > 0;
 

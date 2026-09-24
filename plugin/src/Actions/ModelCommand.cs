@@ -7,20 +7,16 @@ namespace Loupedeck.ClaudeDeckPlugin
     public abstract class SettingKeyCommand : PluginDynamicCommand
     {
         private readonly SettingStepper _stepper;
-        private readonly String _icon;
         private EventHandler _onChanged;
         private String _drawn = "";
 
-        protected SettingKeyCommand(String displayName, String description, SessionSetting setting, String icon)
+        protected SettingKeyCommand(String displayName, String description, SessionSetting setting)
             : base(displayName, description, "Claude", (DeviceType)DeviceTypeAliases.MxCreativeKeypad)
         {
             this.IsWidget = true;
-            this._icon = icon;
             this._stepper = new SettingStepper(setting);
             this._stepper.Changed += (_, _) => this.ActionImageChanged();
         }
-
-        protected override LibraryImage GetCommandLibraryImage(String actionParameter) => new(this._icon + ".svg");
 
         protected override Boolean OnLoad()
         {
@@ -54,7 +50,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     public class ModelCommand : SettingKeyCommand
     {
         public ModelCommand()
-            : base("Model", "The target Claude session's model; tap to step to another", new ModelSetting(), "Models")
+            : base("Model", "The target Claude session's model; tap to step to another", new ModelSetting())
         {
         }
     }
@@ -62,7 +58,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     public class EffortCommand : SettingKeyCommand
     {
         public EffortCommand()
-            : base("Effort", "The target Claude session's effort level; tap to step to another", new EffortSetting(), "Effort")
+            : base("Effort", "The target Claude session's effort level; tap to step to another", new EffortSetting())
         {
         }
     }
@@ -70,7 +66,7 @@ namespace Loupedeck.ClaudeDeckPlugin
     public class PermissionModeCommand : SettingKeyCommand
     {
         public PermissionModeCommand()
-            : base("Permission mode", "The target Claude session's permission mode (ask / auto-edit / plan); tap to step", new ModeSetting(), "Mode")
+            : base("Permission mode", "The target Claude session's permission mode (ask / auto-edit / plan); tap to step", new ModeSetting())
         {
         }
     }

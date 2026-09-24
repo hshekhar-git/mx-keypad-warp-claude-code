@@ -53,7 +53,41 @@
     <Copy SourceFiles="@(PackageFile)" DestinationFiles="@(PackageFile->'$(PluginFolder)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 
-  <Target Name="DeckInstall" AfterTargets="DeckPackage" Condition="'$(NoPluginLink)' != 'true'">
+  <!--
+    The host draws an action's icon - in the Options+ action list and, for a folder, on the folder's
+    own key - from actionicons/<full action name>.svg and actionsymbols/<the same>.svg, with no
+    fallback: a dynamic folder is "DynamicFolder#Loupedeck.ClaudeDeckPlugin.SessionsFolder", a
+    command "Loupedeck.ClaudeDeckPlugin.UsageCommand". The icons are kept under plain names, which
+    the plugin draws on keys by, and copied out under the names the host wants.
+  -->
+  <ItemGroup>
+    <ActionIcon Include="package/actionicons/Sessions.svg" Action="DynamicFolder#Loupedeck.ClaudeDeckPlugin.SessionsFolder" />
+    <ActionIcon Include="package/actionicons/Sessions.svg" Action="DynamicFolderCommand#Loupedeck.ClaudeDeckPlugin.SessionsFolder" />
+    <ActionIcon Include="package/actionicons/Apps.svg" Action="DynamicFolder#Loupedeck.ClaudeDeckPlugin.AppSwitcherFolder" />
+    <ActionIcon Include="package/actionicons/Apps.svg" Action="DynamicFolderCommand#Loupedeck.ClaudeDeckPlugin.AppSwitcherFolder" />
+    <ActionIcon Include="package/actionicons/Models.svg" Action="DynamicFolder#Loupedeck.ClaudeDeckPlugin.ModelsFolder" />
+    <ActionIcon Include="package/actionicons/Models.svg" Action="DynamicFolderCommand#Loupedeck.ClaudeDeckPlugin.ModelsFolder" />
+    <ActionIcon Include="package/actionicons/Overview.svg" Action="Loupedeck.ClaudeDeckPlugin.OverviewCommand" />
+    <ActionIcon Include="package/actionicons/Next.svg" Action="Loupedeck.ClaudeDeckPlugin.NextCommand" />
+    <ActionIcon Include="package/actionicons/Slot.svg" Action="Loupedeck.ClaudeDeckPlugin.SessionSlotCommand" />
+    <ActionIcon Include="package/actionicons/NeedsMe.svg" Action="Loupedeck.ClaudeDeckPlugin.NeedsMeCommand" />
+    <ActionIcon Include="package/actionicons/Working.svg" Action="Loupedeck.ClaudeDeckPlugin.WorkingCommand" />
+    <ActionIcon Include="package/actionicons/Allow.svg" Action="Loupedeck.ClaudeDeckPlugin.AllowCommand" />
+    <ActionIcon Include="package/actionicons/Usage.svg" Action="Loupedeck.ClaudeDeckPlugin.UsageCommand" />
+    <ActionIcon Include="package/actionicons/Models.svg" Action="Loupedeck.ClaudeDeckPlugin.ModelCommand" />
+    <ActionIcon Include="package/actionicons/Effort.svg" Action="Loupedeck.ClaudeDeckPlugin.EffortCommand" />
+    <ActionIcon Include="package/actionicons/Mode.svg" Action="Loupedeck.ClaudeDeckPlugin.PermissionModeCommand" />
+    <ActionIcon Include="package/actionicons/Send.svg" Action="Loupedeck.ClaudeDeckPlugin.ConfiguredKeyCommand" />
+    <ActionIcon Include="package/actionicons/Send.svg" Action="Loupedeck.ClaudeDeckPlugin.SendToClaudeCommand" />
+    <ActionIcon Include="package/actionicons/OpenApp.svg" Action="Loupedeck.ClaudeDeckPlugin.OpenAppCommand" />
+  </ItemGroup>
+
+  <Target Name="DeckActionIcons" AfterTargets="DeckPackage">
+    <Copy SourceFiles="@(ActionIcon)" DestinationFiles="@(ActionIcon->'$(PluginFolder)actionicons/%(Action).svg')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ActionIcon)" DestinationFiles="@(ActionIcon->'$(PluginFolder)actionsymbols/%(Action).svg')" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="DeckInstall" AfterTargets="DeckActionIcons" Condition="'$(NoPluginLink)' != 'true'">
     <MakeDir Directories="$(ServicePlugins)" />
     <WriteLinesToFile File="$(ServicePlugins)/$(AssemblyName).link" Lines="$(PluginFolder)" Overwrite="true" />
     <Exec Command="open loupedeck:plugin/$(PluginId)/reload" ContinueOnError="true" StandardOutputImportance="low" />

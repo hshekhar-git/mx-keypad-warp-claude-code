@@ -70,9 +70,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             PluginDynamicFolderNavigation.ButtonArea;
 
         // The key that opens the folder, on whatever page it is placed.
+        // Asked for by hosts that let a folder draw its own key; this one draws the key itself from
+        // actionicons/ (see the csproj), and the two agree.
         public override BitmapImage GetButtonImage(PluginImageSize imageSize) => TileRenderer.FolderKey("Sessions", "Sessions", imageSize);
-
-        public override LibraryImage GetButtonLibraryImage() => new("Sessions.svg");
 
         public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
 

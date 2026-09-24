@@ -18,9 +18,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static readonly BitmapColor Neutral = new(0x36, 0x3A, 0x40);
         private static readonly BitmapColor Amber = new(0x8A, 0x60, 0x11);
         // The dark of an informational key - lifted off black so it separates from the bezel and
-        // grey text on it has somewhere to go - and the black of a key with nothing on it.
-        private static readonly BitmapColor Empty = new(0x1E, 0x22, 0x28);
-        private static readonly BitmapColor Off = new(0x10, 0x12, 0x15);
+        // grey text on it has somewhere to go - and the black of a key with nothing on it. Both are
+        // dead neutral: the keypad's panel turns even a slight blue cast, at these levels, into navy.
+        private static readonly BitmapColor Empty = new(0x24, 0x24, 0x24);
+        private static readonly BitmapColor Off = new(0x10, 0x10, 0x10);
         private static readonly BitmapColor Warn = new(0xF4, 0xC5, 0x42);
         private static readonly BitmapColor Blue = new(0x2A, 0x6C, 0xB0);
         private static readonly BitmapColor Violet = new(0x67, 0x50, 0xB5);

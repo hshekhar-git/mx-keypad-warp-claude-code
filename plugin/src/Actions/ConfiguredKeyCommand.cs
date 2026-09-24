@@ -78,9 +78,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             return key == null ? TileRenderer.Dark(imageSize) : TileRenderer.Command(key.Label, key.Color, false, imageSize, TileRenderer.IconFor(key));
         }
 
-        protected override LibraryImage GetCommandLibraryImage(String actionParameter) =>
-            new((TileRenderer.IconFor(this.Find(actionParameter)) ?? "Send") + ".svg");
-
         protected override String GetCommandDisplayName(String actionParameter, PluginImageSize imageSize) => "";
     }
 }
