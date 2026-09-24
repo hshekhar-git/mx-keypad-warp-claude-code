@@ -782,6 +782,80 @@ namespace Loupedeck.ClaudeDeckPlugin
             return b.ToImage();
         }
 
+        // ---- folder buttons -----------------------------------------------------------------
+        //
+        // The keys that open the two folders, drawn by the plugin rather than left to the host's
+        // "name over a folder" default, so they look like what they open. The host asks for these
+        // when it lays out the page and does not offer a way to repaint them, so they carry
+        // nothing that goes stale.
+
+        // Claude Sessions: the deck in miniature - a 3x3 of keys in the state colours, dimmed to an
+        // emblem so it is not mistaken for the live Overview key next to it.
+        public static BitmapImage SessionsFolder(PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var w = b.Width;
+            var h = b.Height;
+            b.Clear(Empty);
+
+            BitmapColor[] keys =
+            {
+                Busy, Attention, Done,
+                Done, Idle, Busy,
+                Neutral, Neutral, Neutral,
+            };
+            var cell = (Int32)(w * 0.17);
+            var gap = Math.Max(3, (Int32)(w * 0.04));
+            var grid = (3 * cell) + (2 * gap);
+            var x0 = (w - grid) / 2;
+            var y0 = (Int32)(h * 0.10);
+            for (var i = 0; i < keys.Length; i++)
+            {
+                b.FillRectangle(x0 + ((i % 3) * (cell + gap)), y0 + ((i / 3) * (cell + gap)), cell, cell, Shade(keys[i], 0.35));
+            }
+
+            Foot(b, "Sessions", Bright);
+            return b.ToImage();
+        }
+
+        // App Switcher: the first four apps of the switcher, as a 2x2 of their icons - the same
+        // pinned-then-recent order the folder opens with. Without the helper, four quiet squares.
+        public static BitmapImage AppsFolder(IReadOnlyList<AppInfo> first, PluginImageSize size)
+        {
+            using var b = new BitmapBuilder(size);
+            var w = b.Width;
+            var h = b.Height;
+            b.Clear(Empty);
+
+            var cell = (Int32)(w * 0.30);
+            var gap = Math.Max(3, (Int32)(w * 0.05));
+            var grid = (2 * cell) + gap;
+            var x0 = (w - grid) / 2;
+            var y0 = (Int32)(h * 0.06);
+            for (var i = 0; i < 4; i++)
+            {
+                var x = x0 + ((i % 2) * (cell + gap));
+                var y = y0 + ((i / 2) * (cell + gap));
+                var app = i < first.Count ? first[i] : null;
+                var icon = app != null ? IconBytes(app.Icon) : null;
+                if (icon != null)
+                {
+                    b.DrawImage(icon, x, y, cell, cell, BitmapRotation.None);
+                }
+                else
+                {
+                    b.FillRectangle(x, y, cell, cell, Tint(Empty, 0.12));
+                    if (app != null)
+                    {
+                        DrawCentred(b, Initial(app.Name), y + (cell / 2), (Int32)(cell * 0.6), Bright);
+                    }
+                }
+            }
+
+            Foot(b, "Apps", Bright);
+            return b.ToImage();
+        }
+
         // ---- app switcher -------------------------------------------------------------------
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<String, Byte[]> Icons = new();

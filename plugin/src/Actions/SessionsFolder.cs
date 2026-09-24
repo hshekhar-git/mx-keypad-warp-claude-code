@@ -69,6 +69,11 @@ namespace Loupedeck.ClaudeDeckPlugin
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
             PluginDynamicFolderNavigation.ButtonArea;
 
+        // The key that opens the folder, on whatever page it is placed.
+        public override BitmapImage GetButtonImage(PluginImageSize imageSize) => TileRenderer.SessionsFolder(imageSize);
+
+        public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
+
         public override Boolean Activate()
         {
             this._open = true;

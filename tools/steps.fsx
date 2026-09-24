@@ -39,15 +39,15 @@ let mobile  = session "mobile" "Push notification opt-in" "idle" "" "" "" 0.04 9
 let all     = ResizeArray [ web; api; docs; infra; mobile ]
 let calm    = ResizeArray [ web; docs; infra; mobile ]            // nobody blocked
 
-// ---- keys the host draws itself, approximated -------------------------------------------------
-let plain (title: string) (note: string) =
-    use b = new BitmapBuilder(size)
-    b.Clear(BitmapColor(10, 10, 12))
-    b.FillRectangle((b.Width / 2) - 12, 0, 24, 5, BitmapColor.White)
-    b.DrawText(title, 3, 30, b.Width - 6, 50, Nullable BitmapColor.White, 15)
-    b.DrawText(note, 3, 84, b.Width - 6, 22, Nullable(BitmapColor(120, 124, 130)), 10)
-    b.ToImage()
+// ---- apps, by the icons the helper has saved ---------------------------------------------------
+// Missing icons (com.example.NotInstalled) fall back to a lettered square, so this runs on a
+// machine that has never run the plugin.
+let icons = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "deck", "icons")
+let app name bundle hidden = AppInfo(Pid = 1, Name = name, Bundle = bundle, Hidden = hidden, Icon = Path.Combine(icons, bundle + ".png"))
+let frontApps = [ app "Warp" "dev.warp.Warp-Stable" false; app "Code" "com.microsoft.VSCode" false
+                  app "Google Chrome" "com.google.Chrome" false; app "Figma" "com.figma.Desktop" false ]
 
+// ---- keys the host draws itself, approximated -------------------------------------------------
 let back () =
     use b = new BitmapBuilder(size)
     b.Clear(BitmapColor(28, 30, 34))
@@ -96,9 +96,9 @@ save "main" [
     tile api false 0
     tile docs false 0
     tile infra false 2
-    plain "Claude Sessions" "folder"
+    TileRenderer.SessionsFolder(size)
     TileRenderer.Allow(api, 1, size, 0)
-    plain "App Switcher" "folder" ]
+    TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
 
 // 3  the same page with nobody waiting
 save "calm" [
@@ -108,9 +108,9 @@ save "calm" [
     tile docs false 0
     tile infra false 1
     tile mobile false 0
-    plain "Claude Sessions" "folder"
+    TileRenderer.SessionsFolder(size)
     TileRenderer.Allow(null, 0, size, 0)
-    plain "App Switcher" "folder" ]
+    TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
 
 // 4  inside Claude Sessions: five sessions over the usage row
 save "list" [ back (); tile web true 0; tile api false 0; tile docs false 0; tile infra false 3; tile mobile false 0; usage 0; usage 1; usage 2 ]
@@ -176,10 +176,7 @@ save "step" [
     TileRenderer.Command("esc", null, false, size)
     TileRenderer.Command("/compact", null, false, size) ]
 
-// 9  the app switcher - icons come from the cache the plugin keeps; any that are missing fall back
-//    to a lettered square, so this runs on a machine that has never run the plugin
-let icons = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "deck", "icons")
-let app name bundle hidden = AppInfo(Pid = 1, Name = name, Bundle = bundle, Hidden = hidden, Icon = Path.Combine(icons, bundle + ".png"))
+// 9  the app switcher
 save "apps" [
     back ()
     TileRenderer.App(app "Warp" "dev.warp.Warp-Stable" false, false, "attention", 1, false, size)

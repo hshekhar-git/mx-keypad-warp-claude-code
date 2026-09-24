@@ -33,6 +33,13 @@ namespace Loupedeck.ClaudeDeckPlugin
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
             PluginDynamicFolderNavigation.ButtonArea;
 
+        // The key that opens the folder: the first four apps it would show, as they stand when the
+        // page is laid out.
+        public override BitmapImage GetButtonImage(PluginImageSize imageSize) =>
+            TileRenderer.AppsFolder(Order(Watcher.Apps, Watcher.Recent).Take(4).Select(Watcher.Find).Where(a => a != null).ToList(), imageSize);
+
+        public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
+
         public override Boolean Activate()
         {
             this._open = true;
