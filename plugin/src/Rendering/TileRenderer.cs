@@ -17,7 +17,10 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static readonly BitmapColor Idle = new(0x4E, 0x53, 0x59);
         private static readonly BitmapColor Neutral = new(0x36, 0x3A, 0x40);
         private static readonly BitmapColor Amber = new(0x8A, 0x60, 0x11);
-        private static readonly BitmapColor Empty = new(0x12, 0x14, 0x17);
+        // The dark of an informational key - lifted off black so it separates from the bezel and
+        // grey text on it has somewhere to go - and the black of a key with nothing on it.
+        private static readonly BitmapColor Empty = new(0x1E, 0x22, 0x28);
+        private static readonly BitmapColor Off = new(0x10, 0x12, 0x15);
         private static readonly BitmapColor Warn = new(0xF4, 0xC5, 0x42);
         private static readonly BitmapColor Blue = new(0x2A, 0x6C, 0xB0);
         private static readonly BitmapColor Violet = new(0x67, 0x50, 0xB5);
@@ -37,25 +40,32 @@ namespace Loupedeck.ClaudeDeckPlugin
         // drawn for legibility: at caption size on a key read from arm's length it is the difference
         // between a word and a smudge. The status marks were checked beside words in it.
         private const String Face = "Lexend";
-        private const Int32 Caption = 12;   // the header and footer of a key, and any aside
-        private const Int32 Body = 14;      // a sentence: what a session is doing, a wrapped label
-        private const Int32 Word = 19;      // one word that is the key: a command, a model, a level
-        private const Int32 Big = 22;       // one number that is the key
+        private const Int32 Caption = 13;   // the header and footer of a key, and any aside
+        private const Int32 Body = 15;      // a sentence: what a session is doing, a wrapped label
+        private const Int32 Word = 20;      // one word that is the key: a command, a model, a level
+        private const Int32 Big = 26;       // one number that is the key
 
         // Strings that are pictures - a countdown bar, a face - want cells of one width, which the
         // key face does not give them.
         private const String Mono = "IBM Plex Mono";
 
         // A word shrinks rather than wraps: "ultracode" and "Fable 5.1" stay on one line.
-        private static Int32 WordSize(String word) => (word ?? "").Length > 9 ? 15 : Word;
+        private static Int32 WordSize(String word) => (word ?? "").Length > 8 ? 16 : Word;
+
+        // The name under an icon.
+        private static Int32 LabelSize(String label) => (label ?? "").Length > 7 ? 14 : 16;
+
+        // A caption is one line; a long one gives up a point or two rather than wrap off the key.
+        private static Int32 CaptionSize(String text) =>
+            (text ?? "").Length > 15 ? Caption - 2 : (text ?? "").Length > 12 ? Caption - 1 : Caption;
 
         // The header runs along the top edge of a key and the footer along the bottom, at the
         // same height on every key. `nudge` moves the header down under a gauge.
         private static void Head(BitmapBuilder b, String text, BitmapColor color, Int32 nudge = 0) =>
-            Band(b, text, 0.04, 0.18, Caption, color, nudge);
+            Band(b, text, 0.04, 0.18, CaptionSize(text), color, nudge);
 
         private static void Foot(BitmapBuilder b, String text, BitmapColor color) =>
-            Band(b, text, 0.74, 0.18, Caption, color);
+            Band(b, text, 0.74, 0.18, CaptionSize(text), color);
 
         // The middle of a key that carries one word, sized to fit.
         private static void Centre(BitmapBuilder b, String word, BitmapColor color) =>
@@ -139,7 +149,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             // The session the command row will act on.
             if (selected)
             {
-                var t = Math.Max(2, (Int32)(w * 0.025));
+                var t = Math.Max(3, (Int32)(w * 0.04));
                 var ring = Tint(bg, 0.9);
                 b.FillRectangle(0, 0, t, h, ring);
                 b.FillRectangle(w - t, 0, t, h, ring);
@@ -162,7 +172,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return 0;
             }
 
-            var barH = Math.Max(4, (Int32)(b.Height * 0.045));
+            var barH = Math.Max(5, (Int32)(b.Height * 0.055));
             b.FillRectangle(0, 0, b.Width, barH, Shade(bg, 0.4));
             var filled = Math.Max(2, (Int32)(b.Width * fill));
             b.FillRectangle(0, 0, filled, barH, fill >= 0.8 ? Warn : Tint(bg, 0.7));
@@ -306,9 +316,9 @@ namespace Loupedeck.ClaudeDeckPlugin
                 Band(b, End(label, 40), 0.10, 0.80, Body, BitmapColor.White);
             }
             // A key with an icon: the picture above, the word below.
-            else if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.38), (Int32)(h * 0.38), BitmapColor.White))
+            else if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.37), (Int32)(h * 0.44), BitmapColor.White))
             {
-                Band(b, label, 0.62, 0.26, label.Length > 7 ? 13 : 15, BitmapColor.White);
+                Band(b, label, 0.64, 0.28, LabelSize(label), BitmapColor.White);
             }
             else
             {
@@ -344,14 +354,14 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static BitmapColor UsageColor(Double percent) =>
             percent >= 90 ? UsageFull : percent >= 75 ? UsageHigh : UsageCalm;
 
-        // A small icon in the top-left corner of a usage key, saying which kind of window it is.
+        // An icon in the top-left corner of a usage key, saying which kind of window it is.
         private static void Corner(BitmapBuilder b, String icon) =>
-            Icon(b, icon, (Int32)(b.Width * 0.11), (Int32)(b.Height * 0.13), (Int32)(b.Height * 0.16), Muted);
+            Icon(b, icon, (Int32)(b.Width * 0.13), (Int32)(b.Height * 0.13), (Int32)(b.Height * 0.21), Bright);
 
         // The icon standing in for a number there is not one of yet.
         private static void Placeholder(BitmapBuilder b, String icon)
         {
-            if (!Icon(b, icon, b.Width / 2, (Int32)(b.Height * 0.40), (Int32)(b.Height * 0.34), Faint))
+            if (!Icon(b, icon, b.Width / 2, (Int32)(b.Height * 0.40), (Int32)(b.Height * 0.40), Muted))
             {
                 Band(b, Dash, 0.20, 0.36, Big, Faint);
             }
@@ -381,8 +391,8 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             var barX = (Int32)(w * 0.12);
             var barW = w - (2 * barX);
-            var barH = Math.Max(5, (Int32)(h * 0.06));
-            var barY = (Int32)(h * 0.60);
+            var barH = Math.Max(6, (Int32)(h * 0.07));
+            var barY = (Int32)(h * 0.61);
             b.FillRectangle(barX, barY, barW, barH, Tint(Empty, 0.14));
             b.FillRectangle(barX, barY, Math.Max(2, (Int32)(barW * Math.Min(1.0, window.Percent / 100.0))), barH, color);
 
@@ -572,7 +582,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         public static BitmapImage EmptySlot(Int32 number, PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
-            b.Clear(Empty);
+            b.Clear(Off);
             if (DeckConfig.Ascii)
             {
                 Art(b, "[   ]", 0.26, 0.36, 16, Faint);
@@ -658,7 +668,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var shown = others.Take(8).ToList();
             if (shown.Count > 0)
             {
-                var r = Math.Max(4, (Int32)(w * 0.04));
+                var r = Math.Max(5, (Int32)(w * 0.048));
                 var gap = r;
                 var total = (shown.Count * 2 * r) + ((shown.Count - 1) * gap);
                 var x = ((w - total) / 2) + r;
@@ -764,9 +774,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             if (s == null)
             {
                 b.Clear(Empty);
-                if (!Icon(b, "Allow", w / 2, (Int32)(h * 0.42), (Int32)(h * 0.44), Faint))
+                if (!Icon(b, "Allow", w / 2, (Int32)(h * 0.40), (Int32)(h * 0.48), Muted))
                 {
-                    DrawCentred(b, Ascii.Tick, (Int32)(h * 0.42), (Int32)(h * 0.40), Faint);
+                    DrawCentred(b, Ascii.Tick, (Int32)(h * 0.40), (Int32)(h * 0.40), Muted);
                 }
 
                 Foot(b, "allow", Muted);
@@ -814,7 +824,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         public static BitmapImage Dark(PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
-            b.Clear(Empty);
+            b.Clear(Off);
             return b.ToImage();
         }
 
@@ -926,13 +936,13 @@ namespace Loupedeck.ClaudeDeckPlugin
             using var b = new BitmapBuilder(size);
             var h = b.Height;
             b.Clear(Empty);
-            if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.38), (Int32)(h * 0.40), BitmapColor.White))
+            if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.37), (Int32)(h * 0.46), BitmapColor.White))
             {
-                Band(b, label, 0.62, 0.26, label.Length > 7 ? 13 : 15, Bright);
+                Band(b, label, 0.64, 0.28, LabelSize(label), BitmapColor.White);
             }
             else
             {
-                Centre(b, label, Bright);
+                Centre(b, label, BitmapColor.White);
             }
 
             return b.ToImage();
@@ -947,11 +957,11 @@ namespace Loupedeck.ClaudeDeckPlugin
             var h = b.Height;
             b.Clear(Empty);
 
-            var cell = (Int32)(w * 0.30);
+            var cell = (Int32)(w * 0.32);
             var gap = Math.Max(3, (Int32)(w * 0.05));
             var grid = (2 * cell) + gap;
             var x0 = (w - grid) / 2;
-            var y0 = (Int32)(h * 0.06);
+            var y0 = (Int32)(h * 0.05);
             for (var i = 0; i < 4; i++)
             {
                 var x = x0 + ((i % 2) * (cell + gap));
@@ -1002,9 +1012,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             b.Clear(bg);
 
             var icon = IconBytes(app.Icon);
-            var iconSize = (Int32)(w * 0.56);
+            var iconSize = (Int32)(w * 0.58);
             var iconX = (w - iconSize) / 2;
-            var iconY = (Int32)(h * 0.07);
+            var iconY = (Int32)(h * 0.05);
             if (icon != null)
             {
                 b.DrawImage(icon, iconX, iconY, iconSize, iconSize, BitmapRotation.None);
