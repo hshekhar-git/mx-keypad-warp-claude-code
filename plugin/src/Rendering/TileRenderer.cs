@@ -354,11 +354,8 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static BitmapColor UsageColor(Double percent) =>
             percent >= 90 ? UsageFull : percent >= 75 ? UsageHigh : UsageCalm;
 
-        // An icon in the top-left corner of a usage key, saying which kind of window it is.
-        private static void Corner(BitmapBuilder b, String icon) =>
-            Icon(b, icon, (Int32)(b.Width * 0.13), (Int32)(b.Height * 0.13), (Int32)(b.Height * 0.21), Bright);
-
-        // The icon standing in for a number there is not one of yet.
+        // The icon standing in for a number there is not one of yet. With a number, the number and
+        // its bar are the picture; an icon beside them was clutter.
         private static void Placeholder(BitmapBuilder b, String icon)
         {
             if (!Icon(b, icon, b.Width / 2, (Int32)(b.Height * 0.40), (Int32)(b.Height * 0.40), Muted))
@@ -374,7 +371,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
-            Corner(b, icon);
             Head(b, window.Title, Muted);
 
             if (!window.IsKnown)
@@ -408,7 +404,6 @@ namespace Loupedeck.ClaudeDeckPlugin
             var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
-            Corner(b, "Effort");
             Head(b, "pace", Muted);
 
             String big, bottom;
