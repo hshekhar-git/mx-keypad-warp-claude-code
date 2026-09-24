@@ -344,18 +344,32 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static BitmapColor UsageColor(Double percent) =>
             percent >= 90 ? UsageFull : percent >= 75 ? UsageHigh : UsageCalm;
 
+        // A small icon in the top-left corner of a usage key, saying which kind of window it is.
+        private static void Corner(BitmapBuilder b, String icon) =>
+            Icon(b, icon, (Int32)(b.Width * 0.11), (Int32)(b.Height * 0.13), (Int32)(b.Height * 0.16), Muted);
+
+        // The icon standing in for a number there is not one of yet.
+        private static void Placeholder(BitmapBuilder b, String icon)
+        {
+            if (!Icon(b, icon, b.Width / 2, (Int32)(b.Height * 0.40), (Int32)(b.Height * 0.34), Faint))
+            {
+                Band(b, Dash, 0.20, 0.36, Big, Faint);
+            }
+        }
+
         // One usage window: how much is gone, as a number and a bar, and when it comes back.
-        public static BitmapImage Usage(UsageWindow window, TimeSpan age, PluginImageSize size)
+        public static BitmapImage Usage(UsageWindow window, TimeSpan age, PluginImageSize size, String icon = "Usage")
         {
             using var b = new BitmapBuilder(size);
             var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
+            Corner(b, icon);
             Head(b, window.Title, Muted);
 
             if (!window.IsKnown)
             {
-                Band(b, Dash, 0.20, 0.36, Big, Faint);
+                Placeholder(b, icon);
                 Foot(b, "no data yet", Faint);
                 return b.ToImage();
             }
@@ -384,6 +398,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
+            Corner(b, "Effort");
             Head(b, "pace", Muted);
 
             String big, bottom;
@@ -391,7 +406,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             var (projected, runsOut) = UsageStore.Pace(session, TimeSpan.FromHours(5));
             if (!session.IsKnown || age > TimeSpan.FromMinutes(20))
             {
-                (big, bottom, color) = (Dash, session.IsKnown ? "stale" : "no data yet", Faint);
+                Placeholder(b, "Effort");
+                Foot(b, session.IsKnown ? "stale" : "no data yet", Faint);
+                return b.ToImage();
             }
             else if (session.Percent >= 100)
             {
@@ -399,7 +416,9 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
             else if (projected < 0)
             {
-                (big, bottom, color) = (Dash, "too early to say", Faint);
+                Placeholder(b, "Effort");
+                Foot(b, "too early to say", Faint);
+                return b.ToImage();
             }
             else if (runsOut != DateTime.MinValue)
             {
@@ -455,7 +474,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             var model = page != null ? UsageStore.ModelWindow(page) : u.Models.OrderByDescending(m => m.Percent).FirstOrDefault();
             return model != null
-                ? Usage(new UsageWindow { Title = $"{model.Title.ToLowerInvariant()} week", Percent = model.Percent, ResetsAt = model.ResetsAt }, u.Age, size)
+                ? Usage(new UsageWindow { Title = $"{model.Title.ToLowerInvariant()} week", Percent = model.Percent, ResetsAt = model.ResetsAt }, u.Age, size, "Models")
                 : Pace(u.Session, u.Age, size);
         }
 
@@ -900,32 +919,22 @@ namespace Loupedeck.ClaudeDeckPlugin
         // when it lays out the page and does not offer a way to repaint them, so they carry
         // nothing that goes stale.
 
-        // Claude Sessions: the deck in miniature - a 3x3 of keys in the state colours, dimmed to an
-        // emblem so it is not mistaken for the live Overview key next to it.
-        public static BitmapImage SessionsFolder(PluginImageSize size)
+        // A folder's key: its icon over its name, on the dark of the home page - the same layout as
+        // a command key with an icon, so the home page reads as one set.
+        public static BitmapImage FolderKey(String icon, String label, PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
-            var w = b.Width;
             var h = b.Height;
             b.Clear(Empty);
-
-            BitmapColor[] keys =
+            if (Icon(b, icon, b.Width / 2, (Int32)(h * 0.38), (Int32)(h * 0.40), BitmapColor.White))
             {
-                Busy, Attention, Done,
-                Done, Idle, Busy,
-                Neutral, Neutral, Neutral,
-            };
-            var cell = (Int32)(w * 0.17);
-            var gap = Math.Max(3, (Int32)(w * 0.04));
-            var grid = (3 * cell) + (2 * gap);
-            var x0 = (w - grid) / 2;
-            var y0 = (Int32)(h * 0.10);
-            for (var i = 0; i < keys.Length; i++)
+                Band(b, label, 0.62, 0.26, label.Length > 7 ? 13 : 15, Bright);
+            }
+            else
             {
-                b.FillRectangle(x0 + ((i % 3) * (cell + gap)), y0 + ((i / 3) * (cell + gap)), cell, cell, Shade(keys[i], 0.35));
+                Centre(b, label, Bright);
             }
 
-            Foot(b, "Sessions", Bright);
             return b.ToImage();
         }
 

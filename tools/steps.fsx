@@ -97,7 +97,7 @@ save "main" [
     tile api false 0
     tile docs false 0
     tile infra false 2
-    TileRenderer.SessionsFolder(size)
+    TileRenderer.FolderKey("Sessions", "Sessions", size)
     TileRenderer.Allow(api, 1, size, 0)
     TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
 
@@ -109,7 +109,7 @@ save "calm" [
     tile docs false 0
     tile infra false 1
     tile mobile false 0
-    TileRenderer.SessionsFolder(size)
+    TileRenderer.FolderKey("Sessions", "Sessions", size)
     TileRenderer.Allow(null, 0, size, 0)
     TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
 

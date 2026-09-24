@@ -104,6 +104,10 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public override LibraryImage GetButtonLibraryImage() => new("Models.svg");
 
+        public override BitmapImage GetButtonImage(PluginImageSize imageSize) => TileRenderer.FolderKey("Models", "Models", imageSize);
+
+        public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
+
         public override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)
         {
             var session = Deck.ModelTarget;
