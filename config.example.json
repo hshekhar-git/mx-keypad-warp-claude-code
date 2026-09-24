@@ -23,7 +23,7 @@
   // A turn shorter than minTurnSeconds finishing is not announced - you are still watching it.
   "haptics": { "attention": true, "done": true, "error": true, "minTurnSeconds": 20 },
 
-  // The Claude Sessions folder.
+  // The Sessions folder.
   //   group        "flat" - every session in one list, eight to a page
   //                "tab"  - one page per Warp tab
   //   focusOnOpen  pressing a session also brings its pane to the front (false: just open its page)
@@ -54,7 +54,7 @@
     { "label": "Haiku",  "alias": "haiku",  "color": "green"  }
   ],
 
-  // The App Switcher folder.
+  // The Apps folder.
   //   pinned         bundle ids that always come first, in this order - keys you can learn
   //   hidden         bundle ids never shown
   //   order          everything else: "recent" (like Cmd-Tab), "launch" or "name"

@@ -113,7 +113,7 @@ save "calm" [
     TileRenderer.Allow(null, 0, size, 0)
     TileRenderer.AppsFolder(ResizeArray frontApps, size) ]
 
-// 4  inside Claude Sessions: five sessions over the usage row
+// 4  inside Sessions: five sessions over the usage row
 save "list" [ back (); tile web true 0; tile api false 0; tile docs false 0; tile infra false 3; tile mobile false 0; usage 0; usage 1; usage 2 ]
 
 // 5  one session's page

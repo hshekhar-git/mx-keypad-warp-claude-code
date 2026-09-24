@@ -47,11 +47,16 @@ namespace Loupedeck.ClaudeDeckPlugin
         private volatile String _flash;
         private volatile Int32 _flashUntil;
 
+        private readonly Timer _keyRepaint;
+        private Boolean _keyDrawn;
+
         public SessionsFolder()
         {
-            this.DisplayName = "Claude Sessions";
+            // Short, because the host prints it on the folder's key under the icon.
+            this.DisplayName = "Sessions";
             this.GroupName = "Claude";
             this._tick = new Timer(_ => this.OnTick(), null, Timeout.Infinite, Timeout.Infinite);
+            this._keyRepaint = new Timer(_ => this.RepaintKey(), null, Timeout.Infinite, Timeout.Infinite);
             this._model.Changed += (_, _) => this.Repaint("p:model");
             this._effort.Changed += (_, _) => this.Repaint("p:effort");
             this._mode.Changed += (_, _) => this.Repaint("p:mode");
@@ -69,10 +74,48 @@ namespace Loupedeck.ClaudeDeckPlugin
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
             PluginDynamicFolderNavigation.ButtonArea;
 
-        // The key that opens the folder, on whatever page it is placed.
-        // Asked for by hosts that let a folder draw its own key; this one draws the key itself from
-        // actionicons/ (see the csproj), and the two agree.
-        public override BitmapImage GetButtonImage(PluginImageSize imageSize) => TileRenderer.FolderKey("Sessions", "Sessions", imageSize);
+        // The folder's own key, on whatever page it sits. The host draws it from actionicons/ (see
+        // the csproj) unless it asks here; and it is told the key changed whenever the sessions do,
+        // so a host that asks keeps asking.
+        public override BitmapImage GetButtonImage(PluginImageSize imageSize)
+        {
+            if (!this._keyDrawn)
+            {
+                this._keyDrawn = true;
+                PluginLog.Info("the host draws the Sessions key through the plugin");
+            }
+
+            return TileRenderer.FolderKey("Sessions", "Sessions", imageSize);
+        }
+
+        public override Boolean Load()
+        {
+            Store.Changed += this.OnKeyChanged;
+            this.OnKeyChanged(this, EventArgs.Empty);
+            return base.Load();
+        }
+
+        public override Boolean Unload()
+        {
+            Store.Changed -= this.OnKeyChanged;
+            this._keyRepaint.Change(Timeout.Infinite, Timeout.Infinite);
+            return base.Unload();
+        }
+
+        private void OnKeyChanged(Object sender, EventArgs e) => this._keyRepaint.Change(500, Timeout.Infinite);
+
+        private void RepaintKey()
+        {
+            try
+            {
+                this.Plugin?.OnActionImageChanged(this.Name, null, true);
+                this.Plugin?.OnActionImageChanged(this.CommandName, null, true);
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Warning($"could not ask for the Sessions key to be redrawn: {ex.Message}");
+            }
+        }
 
         public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
 

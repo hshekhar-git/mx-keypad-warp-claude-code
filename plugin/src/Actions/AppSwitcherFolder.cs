@@ -21,11 +21,46 @@ namespace Loupedeck.ClaudeDeckPlugin
         private volatile String _flash;
         private volatile String _held;
         private Timer _unflash;
+        private readonly Timer _keyRepaint;
+        private Boolean _keyDrawn;
 
         public AppSwitcherFolder()
         {
-            this.DisplayName = "App Switcher";
+            // Short, because the host prints it on the folder's key under the icon.
+            this.DisplayName = "Apps";
             this.GroupName = "Apps";
+            this._keyRepaint = new Timer(_ => this.RepaintKey(), null, Timeout.Infinite, Timeout.Infinite);
+        }
+
+        // The folder's own key: the host is told it changed whenever the apps do, so a host that
+        // draws it through GetButtonImage keeps it current.
+        public override Boolean Load()
+        {
+            Watcher.Changed += this.OnKeyChanged;
+            this.OnKeyChanged(this, EventArgs.Empty);
+            return base.Load();
+        }
+
+        public override Boolean Unload()
+        {
+            Watcher.Changed -= this.OnKeyChanged;
+            this._keyRepaint.Change(Timeout.Infinite, Timeout.Infinite);
+            return base.Unload();
+        }
+
+        private void OnKeyChanged(Object sender, EventArgs e) => this._keyRepaint.Change(500, Timeout.Infinite);
+
+        private void RepaintKey()
+        {
+            try
+            {
+                this.Plugin?.OnActionImageChanged(this.Name, null, true);
+                this.Plugin?.OnActionImageChanged(this.CommandName, null, true);
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Warning($"could not ask for the Apps key to be redrawn: {ex.Message}");
+            }
         }
 
         private static AppWatcher Watcher => AppWatcher.Instance;
@@ -35,8 +70,16 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         // The key that opens the folder: the first four apps it would show, as they stand when the
         // page is laid out.
-        public override BitmapImage GetButtonImage(PluginImageSize imageSize) =>
-            TileRenderer.AppsFolder(Order(Watcher.Apps, Watcher.Recent).Take(4).Select(Watcher.Find).Where(a => a != null).ToList(), imageSize);
+        public override BitmapImage GetButtonImage(PluginImageSize imageSize)
+        {
+            if (!this._keyDrawn)
+            {
+                this._keyDrawn = true;
+                PluginLog.Info("the host draws the Apps key through the plugin");
+            }
+
+            return TileRenderer.AppsFolder(Order(Watcher.Apps, Watcher.Recent).Take(4).Select(Watcher.Find).Where(a => a != null).ToList(), imageSize);
+        }
 
         public override String GetButtonDisplayName(PluginImageSize imageSize) => "";
 

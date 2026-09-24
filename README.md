@@ -64,7 +64,7 @@ Sessions** is where a session's own page lives (info, model, effort, mode, answe
 
 ## Plan usage on the keypad
 
-The list inside **Claude Sessions** keeps its bottom row for your plan:
+The list inside **Sessions** keeps its bottom row for your plan:
 
 ```
 ┌───────────┬───────────┬───────────┐
@@ -115,7 +115,7 @@ does when you type `/usage`.
 
 ## Two layers
 
-**Claude Sessions** opens a list of every running session (five to a page above the usage row). **Press
+**Sessions** opens a list of every running session (five to a page above the usage row). **Press
 one and you are on that session's own page:**
 
 ```
@@ -227,7 +227,7 @@ braille beside text. Animation only runs for tiles that are actually moving. `"s
 
 ## App Switcher
 
-A Cmd-Tab you can see. Put **App Switcher** on one key; press it and every running app is a key with
+A Cmd-Tab you can see. Put **Apps** on one key; press it and every running app is a key with
 its real icon. Press one and it comes to the front, and the folder closes itself - one gesture.
 
 - **Pinned apps come first and never move** (Warp by default), because a key you have learned beats a
@@ -266,7 +266,7 @@ default for new sessions. Tapping all the way round to the model already in use 
 
 ## Keys
 
-**Inside the *Claude Sessions* folder** - see [Two layers](#two-layers). In the list, side bars mark
+**Inside the *Sessions* folder** - see [Two layers](#two-layers). In the list, side bars mark
 the pane you are actually in; every press flashes the key; **hold** a tile to interrupt that session
 without opening it.
 
@@ -284,7 +284,7 @@ without opening it.
 | **Permission mode** | `ask`, `auto-edit`, `plan`, and `bypass` / `auto` where enabled | steps it (Shift-Tab) |
 | **Commands → …** | each key from `config.json` | types it, only if a terminal is already in front |
 | **Send to Claude** | a label you choose | text + Return configured in the Options+ form |
-| **App Switcher**, **Open App** | see [App Switcher](#app-switcher) | |
+| **Apps**, **Open App** | see [App Switcher](#app-switcher) | |
 | **Models** | a folder: every configured model, the one in use marked | sets it - see [Model switch](#model-switch) |
 
 **Haptics (MX Master 4)** — three events, remappable in Options+: *Claude needs you* (`knock`),
@@ -353,8 +353,8 @@ Open **Logi Options+ → MX Creative Keypad**. In the actions panel find the plu
 
 | Drag this | Group | Put it |
 |---|---|---|
-| **Claude Sessions** | Claude | any home-page key - it is a folder; pressing it opens the deck |
-| **App Switcher** | Apps | any home-page key - also a folder |
+| **Sessions** | Claude | any home-page key - it is a folder; pressing it opens the deck |
+| **Apps** | Apps | any home-page key - also a folder |
 | **Overview**, **Next**, **Allow** | Claude | home page - see [The main page](#the-main-page) |
 | **Session slot 1…8** | Session slots | home page - as many as you usually have sessions |
 | *optional:* **Needs me**, **Working** | Claude | the plain counts, if you prefer numbers |
@@ -382,13 +382,13 @@ waveform there.
 
 1. Open a **new** Warp tab and run `claude`. Hooks are read when a session starts, so sessions that
    were already running only show up on their next tool call.
-2. Press **Claude Sessions** on the keypad. You should see a **grey** tile named after the folder,
+2. Press **Sessions** on the keypad. You should see a **grey** tile named after the folder,
    above the three usage keys.
 3. Send a prompt. The tile turns **coral**, a half-circle turns beside the tool it is using, and a
    wave flows along its bottom edge.
 4. When Claude finishes it turns **green**; on your home page *Overview* reads `1 your turn` and
    *Next* shows that session.
-5. Click into another app, press **App Switcher**, press **Warp** - Warp comes forward and the folder
+5. Click into another app, press **Apps**, press **Warp** - Warp comes forward and the folder
    closes.
 6. Ask Claude to run something it needs permission for (`run ls in /tmp`). The tile blinks **red** and
    shows the command. Press the tile to open that session's page: **yes / always / no** are the keys
@@ -433,7 +433,7 @@ profile while Warp is in front - use Options+'s own action, which needs no plugi
    device profile to selected one"*.
 3. Drag it to a free key and choose the target, e.g. **Default General Profile**.
 
-Alternatively put **App Switcher** (or an **Open App** key) on the Warp profile: this plugin's
+Alternatively put **Apps** (or an **Open App** key) on the Warp profile: this plugin's
 actions work on every profile.
 
 ## Troubleshooting

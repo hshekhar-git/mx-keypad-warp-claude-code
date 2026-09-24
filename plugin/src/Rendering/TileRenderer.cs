@@ -15,7 +15,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         private static readonly BitmapColor Attention = new(0xB3, 0x28, 0x2D);
         private static readonly BitmapColor Error = new(0x74, 0x39, 0x8C);
         private static readonly BitmapColor Idle = new(0x4E, 0x53, 0x59);
-        private static readonly BitmapColor Neutral = new(0x36, 0x3A, 0x40);
+        private static readonly BitmapColor Neutral = new(0x3A, 0x3A, 0x3A);
         private static readonly BitmapColor Amber = new(0x8A, 0x60, 0x11);
         // The dark of an informational key - lifted off black so it separates from the bezel and
         // grey text on it has somewhere to go - and the black of a key with nothing on it. Both are
@@ -986,8 +986,9 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<String, Byte[]> Icons = new();
 
-        // An app: its icon, its name, a bar underneath when it is the one in front, dimmed when it is
-        // hidden, and - for a terminal hosting Claude sessions - a badge in the deck's own colours.
+        // An app: its icon, filling the key - the icon IS the name - a bar underneath when it is the
+        // one in front, dimmed when it is hidden, and, for a terminal hosting Claude sessions, a
+        // badge in the deck's own colours. Only an app without an icon gets a letter.
         public static BitmapImage App(AppInfo app, Boolean front, String badgeState, Int32 badgeCount, Boolean flash, PluginImageSize size)
         {
             using var b = new BitmapBuilder(size);
@@ -1008,25 +1009,25 @@ namespace Loupedeck.ClaudeDeckPlugin
             b.Clear(bg);
 
             var icon = IconBytes(app.Icon);
-            var iconSize = (Int32)(w * 0.58);
+            var iconSize = (Int32)(w * 0.78);
             var iconX = (w - iconSize) / 2;
-            var iconY = (Int32)(h * 0.05);
+            var iconY = (h - iconSize) / 2 - (Int32)(h * 0.02);
             if (icon != null)
             {
                 b.DrawImage(icon, iconX, iconY, iconSize, iconSize, BitmapRotation.None);
             }
             else
             {
-                b.FillRectangle(iconX, iconY, iconSize, iconSize, Tint(bg, 0.12));
-                DrawCentred(b, Initial(app.Name), iconY + (iconSize / 2), (Int32)(iconSize * 0.6), BitmapColor.White);
+                var box = (Int32)(w * 0.56);
+                b.FillRectangle((w - box) / 2, (h - box) / 2 - (Int32)(h * 0.06), box, box, Tint(bg, 0.12));
+                DrawCentred(b, Initial(app.Name), (h / 2) - (Int32)(h * 0.06), (Int32)(box * 0.6), BitmapColor.White);
+                Foot(b, Middle(app.Name, 15), Muted);
             }
 
             if (app.Hidden && !front)
             {
                 b.FillRectangle(0, 0, w, h, new BitmapColor(Empty.R, Empty.G, Empty.B, 150));
             }
-
-            Band(b, Middle(app.Name, 15), 0.66, 0.22, Caption, app.Hidden && !front ? Muted : BitmapColor.White);
 
             if (front)
             {
