@@ -125,6 +125,10 @@ printf '%s' "$PAYLOAD" | "$JQ" -c \
   | ($o.state // "idle") as $was
   | ($o.pending // "") as $pending
   | (($o.kind // "") == "permission" and $was == "attention" and $pending != "") as $held
+  # A question or a plan arrives twice: as the tool starting, and then as a permission request for
+  # that same tool. Both carry the same input, and both mean the same prompt - not a yes/no.
+  | (($ev == "pre" or $ev == "permission") and $tool == "AskUserQuestion") as $asking
+  | (($ev == "pre" or $ev == "permission") and $tool == "ExitPlanMode") as $planning
 
   # What the session is now, and why.
   | (if   $ev == "start"      then (if ($p.source // "") == "compact" then $was else "idle" end)
@@ -143,8 +147,8 @@ printf '%s' "$PAYLOAD" | "$JQ" -c \
      else $was end) as $state
 
   | (if $state != "attention" then ""
-     elif $ev == "pre" and $tool == "AskUserQuestion" then "question"
-     elif $ev == "pre" and $tool == "ExitPlanMode"    then "plan"
+     elif $asking   then "question"
+     elif $planning then "plan"
      elif $ev == "permission" then "permission"
      elif $was == "attention" then ($o.kind // "permission")
      else "permission" end) as $kind
@@ -191,11 +195,11 @@ printf '%s' "$PAYLOAD" | "$JQ" -c \
       # A single multiple-choice question can be answered from the keypad, so its wording and the
       # option labels travel with the state. Anything more involved is left to the terminal.
       question: (if $keep then ($o.question // "")
-                 elif $ev == "pre" and $tool == "AskUserQuestion"
+                 elif $asking
                    then (($ti.questions // []) | if length > 0 then (.[0].question // "" | clean(120)) else "" end)
                  else "" end),
       options: (if $keep then ($o.options // [])
-                elif $ev == "pre" and $tool == "AskUserQuestion"
+                elif $asking
                   then (($ti.questions // [])
                         | if length == 1 and ((.[0].multiSelect // false) | not)
                           then [(.[0].options // [])[] | (.label // "" | clean(28))] else [] end)
