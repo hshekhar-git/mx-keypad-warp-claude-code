@@ -15,16 +15,19 @@ namespace Loupedeck.ClaudeDeckPlugin
     // PAGE   one session: a way back (which also reports on everyone else - see below), its live tile
     //        (press = jump to its pane), its facts (context, branch, turns, age), its settings (model,
     //        effort, permission mode - tap to step), then your command keys. While it is blocked on a
-    //        prompt the keypad can answer, the answers come first, straight after the tile. The
+    //        prompt the keypad can answer, the answers are the bottom row - the decision row. The
     //        model key carries the weekly window of THIS session's model; the full usage row - its
     //        third key that same window - follows the command keys, on the next page.
     //
-    // The host keeps the top-left key for its own Back, which leaves the folder entirely; hence the
-    // page's own "sessions" key for going up one level. Eight names per page keeps both layers
-    // aligned with the host's paging.
+    // The folder lays out all nine keys itself (navigation None). The list puts the host's go-up key
+    // - which leaves the folder - top-left on every page; a session's page has no use for it and
+    // puts its own "‹ sessions" there instead, which goes up one level and reports on everyone else.
     public class SessionsFolder : PluginDynamicFolder
     {
+        // A page of the list, not counting the go-up key in its corner.
         private const Int32 KeysPerPage = 8;
+        private const Int32 Keys = 9;
+        private const String GoUp = "nav:up";
         private const Int32 FlashFrames = 2;
         private const String Notice = "notice";
 
@@ -72,7 +75,11 @@ namespace Loupedeck.ClaudeDeckPlugin
         private SessionInfo Neediest() => Urgency.Queue().FirstOrDefault(s => s.Key != this._page);
 
         public override PluginDynamicFolderNavigation GetNavigationArea(DeviceType deviceType) =>
-            PluginDynamicFolderNavigation.ButtonArea;
+            PluginDynamicFolderNavigation.None;
+
+        // Every page's copy of the way back is the same key.
+        private static String Canon(String p) =>
+            p != null && p.StartsWith("p:back:", StringComparison.Ordinal) ? "p:back" : p;
 
         // The folder's own key, on whatever page it sits. The host draws it from actionicons/ (see
         // the csproj) unless it asks here; and it is told the key changed whenever the sessions do,
@@ -151,7 +158,20 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         // ---- layout -------------------------------------------------------------------------
 
-        private List<String> BuildParameters() => this._page != null ? this.BuildPage() : BuildList();
+        private List<String> BuildParameters() => this._page != null ? this.BuildPage() : WithGoUp(BuildList());
+
+        // The list is laid out eight to a page; each page gets the go-up key in its corner.
+        private static List<String> WithGoUp(List<String> keys)
+        {
+            var paged = new List<String>();
+            for (var i = 0; i < Math.Max(1, keys.Count); i += KeysPerPage)
+            {
+                paged.Add(GoUp);
+                paged.AddRange(keys.Skip(i).Take(KeysPerPage));
+            }
+
+            return paged;
+        }
 
         private static List<String> BuildList()
         {
@@ -214,41 +234,85 @@ namespace Loupedeck.ClaudeDeckPlugin
             return list;
         }
 
-        private IReadOnlyList<AnswerKey> PageAnswers() => Deck.AnswersFor(this.Page, KeysPerPage - 2);
+        // Up to two rows of answers: a question can have four options, and rows two and three hold six.
+        private IReadOnlyList<AnswerKey> PageAnswers() => Deck.AnswersFor(this.Page, 6);
 
+        // A session's page, nine keys at a time:
+        //
+        //   ‹ sessions   tile     info
+        //   model        effort   mode
+        //   the decision row: the answers to what it is blocked on, or your first three command keys
+        //
+        // Four to six answers take the middle row too, and the settings move to the next page. Every
+        // later page starts with the way back and ends with the usage row, if that is on.
         private List<String> BuildPage()
         {
             var answers = this.PageAnswers();
             this._answerCount = answers.Count;
             this._limited = this.Page?.IsLimited == true;
 
-            var list = new List<String> { "p:back", "p:tile" };
-            list.AddRange(answers.Select((_, i) => $"p:ans:{i}"));
+            var pad = 0;
+            String Blank() => $"x:page:{pad++}";
+            List<String> Row(IEnumerable<String> keys, Int32 width) =>
+                keys.Concat(Enumerable.Range(0, width).Select(_ => Blank())).Take(width).ToList();
 
-            // Out of usage: the one thing worth doing about it, offered where the answers would be.
-            if (this.Page?.IsLimited == true)
+            var settings = new[] { "p:model", "p:effort", "p:mode" };
+            var commands = new List<String>();
+            if (this._limited)
             {
-                list.Add("p:lowpri");
+                // Out of usage: the one thing worth doing about it, first in the decision row.
+                commands.Add("p:lowpri");
             }
-            list.AddRange(new[] { "p:info", "p:model", "p:effort", "p:mode" });
-            list.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
 
-            // Plan usage goes after everything else, never instead of it: padded so that it is the
-            // bottom row of whichever page it lands on - page two, with the default keys.
-            if (DeckConfig.PageUsageRow)
+            commands.AddRange(DeckConfig.Keys.Select((_, i) => $"p:k:{i}"));
+
+            var list = new List<String> { "p:back", "p:tile", "p:info" };
+            var rest = new List<String>();
+            var decisions = answers.Select((_, i) => $"p:ans:{i}").ToList();
+            if (decisions.Count > 3)
             {
-                var row = KeysPerPage - 3;
-                var used = list.Count % KeysPerPage;
-                var pad = used <= row ? row - used : KeysPerPage - used + row;
-                list.AddRange(Enumerable.Range(0, pad).Select(n => $"x:page:{n}"));
-                list.AddRange(Enumerable.Range(0, 3).Select(n => $"p:u:{n}"));
+                list.AddRange(Row(decisions, 6));
+                rest.AddRange(settings);
+                rest.AddRange(commands);
+            }
+            else if (decisions.Count > 0)
+            {
+                list.AddRange(settings);
+                list.AddRange(Row(decisions, 3));
+                rest.AddRange(commands);
+            }
+            else
+            {
+                list.AddRange(settings);
+                list.AddRange(Row(commands.Take(3), 3));
+                rest.AddRange(commands.Skip(3));
+            }
+
+            // Later pages: the way back, then the rest, with the usage row as the last page's bottom row.
+            var usage = DeckConfig.PageUsageRow;
+            var page = 2;
+            while (rest.Count > 0 || usage)
+            {
+                list.Add($"p:back:{page++}");
+                if (usage && rest.Count <= 5)
+                {
+                    list.AddRange(Row(rest, 5));
+                    list.AddRange(Enumerable.Range(0, 3).Select(n => $"p:u:{n}"));
+                    rest.Clear();
+                    usage = false;
+                }
+                else
+                {
+                    list.AddRange(Row(rest.Take(8), 8));
+                    rest = rest.Skip(8).ToList();
+                }
             }
 
             return list;
         }
 
         public override IEnumerable<String> GetButtonPressActionNames(DeviceType deviceType) =>
-            this.BuildParameters().Select(p => this.CreateCommandName(p)).ToList();
+            this.BuildParameters().Select(p => p == GoUp ? PluginDynamicFolder.NavigateUpActionName : this.CreateCommandName(p)).ToList();
 
         private void Show(String sessionKey)
         {
@@ -307,7 +371,7 @@ namespace Loupedeck.ClaudeDeckPlugin
                 return;
             }
 
-            foreach (var name in this.BuildParameters())
+            foreach (var name in this.BuildParameters().Where(n => n != GoUp))
             {
                 this.CommandImageChanged(name);
             }
@@ -347,7 +411,10 @@ namespace Loupedeck.ClaudeDeckPlugin
                 // Somebody else is blocked: the way back blinks until they are not.
                 if (this.Others.Any(o => o.State == "attention"))
                 {
-                    this.CommandImageChanged("p:back");
+                    foreach (var back in this.BuildParameters().Where(n => Canon(n) == "p:back"))
+                    {
+                        this.CommandImageChanged(back);
+                    }
                 }
 
                 return;
@@ -374,6 +441,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         // Holding a session - its tile in the list, or the tile on its page - interrupts it.
         public override Boolean ProcessButtonEvent2(String actionParameter, DeviceButtonEvent2 buttonEvent)
         {
+            actionParameter = Canon(actionParameter);
             // Holding the way back skips the list and goes straight to whoever needs you most.
             if (actionParameter == "p:back")
             {
@@ -452,6 +520,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public override void RunCommand(String actionParameter)
         {
+            actionParameter = Canon(actionParameter);
             if (actionParameter == null)
             {
                 return;
@@ -542,6 +611,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public override BitmapImage GetCommandImage(String actionParameter, PluginImageSize imageSize)
         {
+            actionParameter = Canon(actionParameter);
             if (actionParameter == null)
             {
                 return TileRenderer.Dark(imageSize);

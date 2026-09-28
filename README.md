@@ -120,23 +120,25 @@ one and you are on that session's own page:**
 
 ```
 ┌───────────┬───────────┬───────────┐
-│  ‹ Back   │ ‹ sessions│  the tile │   ‹ sessions  up one level - and the other sessions' way of
-│ (Options+)│  ● ● ●    │ Edit 2:31 │                 tapping you on the shoulder (see below)
+│ ‹ sessions│  the tile │  32% ctx  │   ‹ sessions  up one level - and the other sessions' way of
+│  ● ● ●    │ Edit 2:31 │ 317k of 1M│                 tapping you on the shoulder (see below)
 ├───────────┼───────────┼───────────┤   the tile    live; press = jump to its pane, hold = interrupt
-│  32% ctx  │   model   │  effort   │   info        context % and tokens, branch, turns, age
-│ 317k of 1M│ Fable 5.1 │   high    │   model       tap to step (see Model switch); underneath, how
-│ feat/hero │1M·week 57%│ ~2x opus  │               much of THAT model's weekly window is gone
-├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max · ultracode;
-│   mode    │    esc    │ /compact  │               underneath, how fast this burns the plan (see below)
-│ auto-edit │           │           │   mode        ask · auto-edit · plan · [bypass] · [auto]
-└───────────┴───────────┴───────────┘   then your command keys; more on the next page ▶
-  next page ▶  any further command keys, then the usage row along the bottom:
+│   model   │  effort   │   mode    │   info        context % and tokens, branch, turns, age
+│ Fable 5.1 │   high    │ auto-edit │   model       tap to step (see Model switch); underneath, how
+│1M·week 57%│ ~2x opus  │           │               much of THAT model's weekly window is gone
+├───────────┼───────────┼───────────┤   effort      auto · low · medium · high · xhigh · max · ultracode
+│    esc    │ /compact  │ continue  │   mode        ask · auto-edit · plan · [bypass] · [auto]
+└───────────┴───────────┴───────────┘   bottom row  the DECISION ROW: your first three command keys,
+                                                    or, while blocked, the answers
+  next page ▶  ‹ sessions, any further command keys, then the usage row along the bottom:
                session · weekly · this session's model (fable week 57%)
+  A question with four to six options takes the middle row too; the settings move to page two.
+  The folder draws all nine keys itself, so there is no Options+ back arrow on a session's page.
 ```
 
 `"pageUsageRow": false` leaves the usage row off the session's page.
 
-While the session is **blocked**, the answers come first, straight after the tile: **yes / always / no**
+While the session is **blocked**, the answers are the bottom row - the decision row: **yes / always / no**
 for a permission prompt, the **actual option labels** for a multiple-choice question.
 
 **While you are inside one session, the `‹ sessions` key watches the rest.** It blinks **red** with

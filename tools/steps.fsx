@@ -118,8 +118,8 @@ save "list" [ back (); tile web true 0; tile api false 0; tile docs false 0; til
 let model  = new SettingStepper(ModelSetting())
 let effort = new SettingStepper(EffortSetting())
 let mode   = new SettingStepper(ModeSetting())
+// Nine keys, the folder's own: the way back, the tile, its facts; its settings; the decision row.
 save "page" [
-    back ()
     TileRenderer.Back(ResizeArray [ api; docs; infra; mobile ], false, size, 0)
     tile web true 2
     TileRenderer.Info(web, size)
@@ -127,20 +127,20 @@ save "page" [
     effort.Render(web, false, size)
     mode.Render(web, false, size)
     TileRenderer.Command("esc", null, false, size, "Escape")
-    TileRenderer.Command("/compact", null, false, size, "Compact") ]
+    TileRenderer.Command("/compact", null, false, size, "Compact")
+    TileRenderer.Command("continue", null, false, size, "Continue") ]
 
-
-// 6  a blocked session's page: the answers come first
+// 6  a blocked session's page: the answers are the decision row
 save "answer" [
-    back ()
     TileRenderer.Back(ResizeArray [ web; docs; infra; mobile ], false, size, 0)
     tile api true 0
-    TileRenderer.Command("yes", "green", false, size)
-    TileRenderer.Command("always", "amber", false, size)
-    TileRenderer.Command("no", "red", false, size)
     TileRenderer.Info(api, size)
     model.Render(api, false, size)
-    effort.Render(api, false, size) ]
+    effort.Render(api, false, size)
+    mode.Render(api, false, size)
+    TileRenderer.Command("yes", "green", false, size)
+    TileRenderer.Command("always", "amber", false, size)
+    TileRenderer.Command("no", "red", false, size) ]
 
 // 7  a multiple-choice question
 let asking = session "api" "Rate limiter for /search" "attention" "question" "AskUserQuestion" "" 0.18 25L
@@ -153,19 +153,18 @@ question.Selected <- asking.Selected
 question.ContextTokens <- 180000L
 question.ContextWindow <- 1000000
 save "question" [
-    back ()
     TileRenderer.Back(ResizeArray [ web; docs; infra; mobile ], false, size, 0)
     tile question true 0
-    TileRenderer.Command("1 Redis", "coral", false, size)
-    TileRenderer.Command("2 Postgres", "coral", false, size)
-    TileRenderer.Command("3 In memory", "coral", false, size)
     TileRenderer.Info(question, size)
     model.Render(question, false, size)
-    effort.Render(question, false, size) ]
+    effort.Render(question, false, size)
+    mode.Render(question, false, size)
+    TileRenderer.Command("1 Redis", "coral", false, size)
+    TileRenderer.Command("2 Postgres", "coral", false, size)
+    TileRenderer.Command("3 In memory", "coral", false, size) ]
 
 // 8  tap-to-step, mid-gesture
 save "step" [
-    back ()
     TileRenderer.Back(ResizeArray [ api; docs; infra; mobile ], false, size, 0)
     tile docs true 0
     TileRenderer.Info(docs, size)
@@ -173,7 +172,8 @@ save "step" [
     TileRenderer.Model("effort ~2.8x", "xhigh", TileRenderer.Ascii.Countdown 0.6, "coral", true, false, size)
     mode.Render(docs, false, size)
     TileRenderer.Command("esc", null, false, size, "Escape")
-    TileRenderer.Command("/compact", null, false, size, "Compact") ]
+    TileRenderer.Command("/compact", null, false, size, "Compact")
+    TileRenderer.Command("continue", null, false, size, "Continue") ]
 
 // 9  the app switcher
 save "apps" [
