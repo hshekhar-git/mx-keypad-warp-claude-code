@@ -177,5 +177,6 @@ $(bold "Installed. Three things only you can do:")
      coral then green. Sessions that were already running appear on their next tool call.
 
   MX Master 4 haptics:  Logi Options+ -> MX Master 4 -> Haptic feedback -> enable this plugin.
+  A stopped session:    sounds four tones on this Mac - tune or silence it under "beep" in ~/.claude/deck/config.json
   Something off?        see "Troubleshooting" in README.md
 EOF

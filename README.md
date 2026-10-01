@@ -1,8 +1,8 @@
 # mx-keypad-warp-claude-code
 
 Every running [Claude Code](https://claude.com/claude-code) session as a live tile on a **Logitech MX
-Creative Keypad** — jump to it, answer its permission prompts, interrupt it — and a buzz on an
-**MX Master 4** when one needs you.
+Creative Keypad** — jump to it, answer its permission prompts, interrupt it — and, when something
+stops one, four tones from your Mac and a buzz on an **MX Master 4**.
 
 <p align="center"><img src="docs/steps/03-main.png" width="820" alt="An MX Creative Keypad showing an overview of five Claude sessions, the one that needs you next, four live session tiles, and an Allow key with the pending command written on it."></p>
 
@@ -290,6 +290,26 @@ without opening it.
 **Haptics (MX Master 4)** — three events, remappable in Options+: *Claude needs you* (`knock`),
 *Claude finished* (`completed`, only for turns longer than 20 s), *Claude errored* (`angry_alert`).
 
+**A tone when something stops a session** — your Mac sounds *Glass* four times, 0.7 s apart, and
+then stays quiet: a tap on the shoulder, not an alarm that rings until somebody comes. It needs no
+mouse and no setup. Three things count as a stop:
+
+| Stop | What happened | Setting |
+|---|---|---|
+| **blocked on you** | a permission prompt, a question, a plan waiting for approval | `attention` |
+| **the turn died** | an API error, or your usage limit | `error` |
+| **the process went away** | `claude` crashed or was killed mid-turn. Its tile simply vanishes, so the tone is the only sign | `gone` |
+
+- A turn finishing by itself is not a stop, and is silent. `"done": true` makes it sound too, for
+  turns longer than `minTurnSeconds`.
+- Quitting a session yourself is not a stop either: Claude Code says goodbye first.
+- There is one run of tones at a time. A second session stopping while the first is still sounding
+  starts the count again instead of ringing over it.
+- The tones stop early if the session gets going again - answer the prompt after the second tone
+  and there is no third.
+- Which stops, how many tones, how far apart, which sound and how loud are all under `beep` in the
+  [config](#configuration). `"times": 0` turns it off.
+
 ### Safety of the typing keys
 
 - Every keystroke is sent by one AppleScript that first checks which app is in front and refuses if
@@ -391,8 +411,9 @@ waveform there.
 5. Click into another app, press **Apps**, press **Warp** - Warp comes forward and the folder
    closes.
 6. Ask Claude to run something it needs permission for (`run ls in /tmp`). The tile blinks **red** and
-   shows the command. Press the tile to open that session's page: **yes / always / no** are the keys
-   right after it. (*Allow* on the home page shows the same prompt and approves it in one press.)
+   shows the command, and your Mac sounds four tones. Press the tile to open that session's page:
+   **yes / always / no** are the keys right after it. (*Allow* on the home page shows the same prompt
+   and approves it in one press.)
 7. On that page, tap **effort** a couple of times and stop: about a second and a half later
    `/effort <level>` is typed into the session and the key shows the new level.
 
@@ -457,6 +478,7 @@ actions work on every profile.
 | Usage keys are grey with `35m old` | No session has talked to the API for that long; the numbers refresh on the next reply |
 | Usage differs from the usage page | The keys show what Claude Code derives from the rate-limit headers of its latest API response; the page is computed server-side and can disagree. Compare with `/usage` inside Claude Code |
 | No buzz on the MX Master 4 | Step 5, and check `"haptics"` in `~/.claude/deck/config.json`. *Claude finished* only fires for turns longer than `minTurnSeconds` (20) |
+| No tone when a session stops | Check `"beep"` in `~/.claude/deck/config.json` - `times` above 0, and the stop you expect not set to `false` - and that the Mac is not muted. The log has a line for every run of tones (`web-app stopped (attention): 4 tone(s)`) and names a `sound` it could not find. A turn finishing is silent unless `"done": true` |
 
 ## Configuration
 
@@ -471,6 +493,7 @@ annotated version; the installer seeds your copy from it.
 | `showContext` | the context-window gauge along the top of each tile |
 | `contextWindow`, `contextWindows` | the window size the gauge is measured against, when Claude Code has not said (it usually has - see [Plan usage](#plan-usage-on-the-keypad)) |
 | `haptics` | `attention` / `done` / `error` on or off, and `minTurnSeconds`: a turn shorter than this finishing is not announced |
+| `beep` | the tone when something stops a session. `attention` / `error` / `gone` / `done`: which stops sound it · `times`: how many tones (4; 0 is off) · `every`: seconds between them (0.7) · `sound`: a macOS alert sound by name (`Glass`, `Ping`, `Hero`, ...) or the path of an audio file · `volume`: 1 is as recorded |
 | `sessions` | `group`: `"flat"` or `"tab"` (one page per Warp tab) · `focusOnOpen`: opening a session also brings its pane forward · `usageRow`: the three usage keys under the list · `pageUsageRow`: and under a session's page |
 | `usage` | `perModel`: ask Claude Code (`claude -p /usage`) for the per-model weekly window while a usage key is showing · `claudePath`: where `claude` is, if not in `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin` |
 | `models` | what **Model** steps through and **Models** lists: `alias` (typed after `/model`), `label`, `match`, `color` |
@@ -497,7 +520,8 @@ never unbinds one, and giving a key an `id` lets you change even what it types.
                                                                   │              │
                           App Switcher, "you are here", badges ◄──┘              ├─► every key and tile
                                                                                  └─► state changes ─► haptic
-                                                                                     events ─► MX Master 4
+                                                                                     events ─► MX Master 4,
+                                                                                     and afplay ─► the tone
 ```
 
 Everything under `~/.claude/deck/`: `sessions/` (one file per live session), `status/`, `usage.json`,
@@ -526,7 +550,7 @@ hooks/deck-statusline.sh      the status line tap: plan usage, and each session'
 hooks/install-hooks.sh        edits ~/.claude/settings.json - additive, idempotent, reversible
 helper/deck-apps.swift        native app watcher: pushes running/frontmost apps, extracts icons
 plugin/src/
-  ClaudeDeckPlugin.cs         lifetime of the background pieces; state changes -> haptic events
+  ClaudeDeckPlugin.cs         lifetime of the background pieces; state changes -> haptic events, the tone
   Actions/                    everything you can put on a key
     SessionsFolder.cs           the list, and a page per session
     MainPageCommands.cs         Overview, Next, Session slots
@@ -535,7 +559,8 @@ plugin/src/
     UsageCommand.cs             the usage gauges                   AppSwitcherFolder.cs, OpenAppCommand.cs
     ConfiguredKeyCommand.cs     keys from config.json              SendToClaudeCommand.cs
   Sessions/                   SessionStore (the source of truth), TranscriptStats, UsageStore, Settings
-                              (tap-to-step), Deck (what a press does), DeckConfig, ModelNames, HookStatus
+                              (tap-to-step), Deck (what a press does), DeckConfig, ModelNames, HookStatus,
+                              Beep (the tone a stopped session sounds)
   Term/                       WarpTabs (layout), TermFocus (go to a pane), TermInput (guarded typing)
   Apps/                       AppWatcher, Apps
   Rendering/TileRenderer.cs   every pixel

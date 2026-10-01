@@ -23,6 +23,22 @@
   // A turn shorter than minTurnSeconds finishing is not announced - you are still watching it.
   "haptics": { "attention": true, "done": true, "error": true, "minTurnSeconds": 20 },
 
+  // A tone from your Mac when something stops a session: `times` of them, and then quiet.
+  //   attention  it is blocked on you - a permission prompt, a question, a plan
+  //   error      its turn died - an API error, or your usage limit
+  //   gone       its claude process went away mid-turn - crashed, or killed
+  //   done       a turn simply finishing. Off, because nothing stopped it; when on, a turn shorter
+  //              than haptics.minTurnSeconds still finishes in silence
+  //   times      how many tones a stop gets, up to 20; 0 for none at all
+  //   every      seconds from the start of one tone to the start of the next, 0.2 to 10
+  //   sound      a macOS alert sound by name - Glass, Ping, Hero, Funk, Sosumi, Submarine, Morse,
+  //              Tink, Basso (/System/Library/Sounds, or your own .aiff in ~/Library/Sounds) - or
+  //              the path of any audio file
+  //   volume     1 plays the sound as recorded; 0.5 is quieter, 2 louder, 4 the most
+  // A second session stopping while the tones are still sounding starts the count again rather than
+  // ringing over them, and they stop early if the session gets going again.
+  "beep": { "attention": true, "error": true, "gone": true, "done": false, "times": 4, "every": 0.7, "sound": "Glass", "volume": 1 },
+
   // The Sessions folder.
   //   group        "flat" - every session in one list, eight to a page
   //                "tab"  - one page per Warp tab

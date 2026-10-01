@@ -92,6 +92,14 @@ namespace Loupedeck.ClaudeDeckPlugin
         public SessionInfo Session { get; init; }
         public String From { get; init; } = "";
         public Int64 PreviousSince { get; init; }
+
+        // Whether this is a turn finishing that had been running for at least so many seconds.
+        public Boolean FinishedAfter(Int32 seconds)
+        {
+            var ran = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - this.Session.TurnSince;
+            var wasRunning = this.From is "busy" or "attention";
+            return this.Session.State == "done" && wasRunning && this.Session.TurnSince > 0 && ran >= seconds;
+        }
     }
 
     // The single source of truth about sessions: the hook's files, joined with Warp's tab layout and
@@ -143,6 +151,10 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         public event EventHandler<TransitionEventArgs> Transition;
 
+        // A session whose claude process went away with its turn still running: nothing ended the
+        // turn, the process itself was stopped. It is off the deck by the time this is raised.
+        public event EventHandler<SessionInfo> Gone;
+
         private SessionStore()
         {
             // A burst of hook writes settles into one reload; the steady check is what notices a
@@ -188,7 +200,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
             try
             {
-                var sessions = this.ReadSessions();
+                var sessions = this.ReadSessions(out var gone);
                 this.Place(sessions);
                 this.Enrich(sessions);
                 ApplyStatus(sessions);
@@ -217,6 +229,11 @@ namespace Loupedeck.ClaudeDeckPlugin
                     this.Transition?.Invoke(this, t);
                 }
 
+                foreach (var s in gone)
+                {
+                    this.Gone?.Invoke(this, s);
+                }
+
                 if (layoutChanged)
                 {
                     this.Changed?.Invoke(this, new LayoutChangedEventArgs());
@@ -236,9 +253,10 @@ namespace Loupedeck.ClaudeDeckPlugin
             }
         }
 
-        private List<SessionInfo> ReadSessions()
+        private List<SessionInfo> ReadSessions(out List<SessionInfo> gone)
         {
             var list = new List<SessionInfo>();
+            gone = new List<SessionInfo>();
             var dir = DeckConfig.SessionsDir;
             if (!Directory.Exists(dir))
             {
@@ -316,6 +334,13 @@ namespace Loupedeck.ClaudeDeckPlugin
                     }
                     catch
                     {
+                    }
+
+                    // Lost in the middle of a turn - and while this was watching, not merely found
+                    // dead when the plugin started, which is old news.
+                    if (this._primed && s.Pid > 0 && s.State == "busy")
+                    {
+                        gone.Add(s);
                     }
 
                     continue;
@@ -569,6 +594,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             this._disposed = true;
             this.Changed = null;
             this.Transition = null;
+            this.Gone = null;
             this._watch.Dispose();
             TranscriptStats.Clear();
         }

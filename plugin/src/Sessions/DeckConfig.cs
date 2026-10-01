@@ -91,6 +91,27 @@ namespace Loupedeck.ClaudeDeckPlugin
         // A turn shorter than this finishing is not worth a buzz: you are still looking at it.
         public static Int32 HapticMinTurnSeconds => _current.HapticMinTurnSeconds;
 
+        // Which stops sound the tone: blocked on you, the turn died, the claude process went away
+        // mid-turn - and, only if asked for, a turn simply finishing.
+        public static Boolean BeepAttention => _current.BeepAttention;
+
+        public static Boolean BeepError => _current.BeepError;
+
+        public static Boolean BeepGone => _current.BeepGone;
+
+        public static Boolean BeepDone => _current.BeepDone;
+
+        // How many tones a stop gets, and how far apart they start.
+        public static Int32 BeepTimes => _current.BeepTimes;
+
+        public static Int32 BeepEveryMs => _current.BeepEveryMs;
+
+        // The audio file that is the tone, already found on disk.
+        public static String BeepSound => _current.BeepSound;
+
+        // 1 is the file as recorded.
+        public static Double BeepVolume => _current.BeepVolume;
+
         // App switcher: bundle ids that always come first, in this order, so they never move.
         public static IReadOnlyList<String> PinnedApps => _current.PinnedApps;
 
@@ -221,6 +242,14 @@ namespace Loupedeck.ClaudeDeckPlugin
             public Boolean HapticDone { get; private set; } = true;
             public Boolean HapticError { get; private set; } = true;
             public Int32 HapticMinTurnSeconds { get; private set; } = 20;
+            public Boolean BeepAttention { get; private set; } = true;
+            public Boolean BeepError { get; private set; } = true;
+            public Boolean BeepGone { get; private set; } = true;
+            public Boolean BeepDone { get; private set; }
+            public Int32 BeepTimes { get; private set; } = 4;
+            public Int32 BeepEveryMs { get; private set; } = 700;
+            public String BeepSound { get; private set; } = "/System/Library/Sounds/Glass.aiff";
+            public Double BeepVolume { get; private set; } = 1;
             public Int32 DefaultContextWindow { get; private set; } = 200_000;
             public Dictionary<String, Int32> ContextWindows { get; private set; } = new();
             public IReadOnlyList<String> PinnedApps { get; private set; } = new[] { "dev.warp.Warp-Stable" };
@@ -301,6 +330,43 @@ namespace Loupedeck.ClaudeDeckPlugin
                     if (h.TryGetProperty("minTurnSeconds", out var m) && m.TryGetInt32(out var secs) && secs >= 0)
                     {
                         s.HapticMinTurnSeconds = secs;
+                    }
+                }
+
+                if (root.TryGetProperty("beep", out var beep) && beep.ValueKind == JsonValueKind.Object)
+                {
+                    s.BeepAttention = Bool(beep, "attention", true);
+                    s.BeepError = Bool(beep, "error", true);
+                    s.BeepGone = Bool(beep, "gone", true);
+                    s.BeepDone = Bool(beep, "done", false);
+
+                    // Held to what a tap on the shoulder is: a handful of tones, close together.
+                    if (Number(beep, "times") is { } times && times >= 0)
+                    {
+                        s.BeepTimes = (Int32)Math.Min(times, 20);
+                    }
+
+                    if (Number(beep, "every") is { } every && every > 0)
+                    {
+                        s.BeepEveryMs = (Int32)(Math.Clamp(every, 0.2, 10) * 1000);
+                    }
+
+                    if (Number(beep, "volume") is { } volume && volume >= 0)
+                    {
+                        s.BeepVolume = Math.Min(volume, 4);
+                    }
+
+                    // A name that is not there keeps the tone there was: a typo should not mean silence.
+                    if (Str(beep, "sound") is { Length: > 0 } sound)
+                    {
+                        if (SoundFile(sound) is { } file)
+                        {
+                            s.BeepSound = file;
+                        }
+                        else
+                        {
+                            PluginLog.Warning($"beep.sound \"{sound}\" was not found; using {s.BeepSound}");
+                        }
                     }
                 }
 
@@ -423,6 +489,26 @@ namespace Loupedeck.ClaudeDeckPlugin
                 e.TryGetProperty(name, out var v) && v.ValueKind is JsonValueKind.True or JsonValueKind.False
                     ? v.GetBoolean()
                     : fallback;
+
+            private static Double? Number(JsonElement e, String name) =>
+                e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetDouble(out var n) ? n : null;
+
+            // A bare name is one of the alert sounds macOS keeps - yours first, then the system's,
+            // which is the order it looks in itself. A path, "~/" allowed, is a file of your own.
+            private static String SoundFile(String sound)
+            {
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (sound.StartsWith("~/", StringComparison.Ordinal))
+                {
+                    sound = Path.Combine(home, sound.Substring(2));
+                }
+
+                var candidates = sound.StartsWith('/')
+                    ? new[] { sound }
+                    : new[] { Path.Combine(home, "Library", "Sounds"), "/Library/Sounds", "/System/Library/Sounds" }
+                        .Select(folder => Path.Combine(folder, sound + ".aiff"));
+                return candidates.FirstOrDefault(File.Exists);
+            }
         }
     }
 }

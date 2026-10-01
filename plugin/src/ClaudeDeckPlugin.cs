@@ -6,8 +6,8 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System.Threading.Tasks;
 
     // The plugin itself: it owns the lifetime of the background pieces (config, sessions, usage, the
-    // app watcher) and turns session state changes into haptic events. Everything a key does lives in
-    // the Actions folder.
+    // app watcher) and turns session state changes into haptic events and the tone a stopped session
+    // sounds. Everything a key does lives in the Actions folder.
     public class ClaudeDeckPlugin : Plugin
     {
         // name -> (title, description). The names are repeated in package/events/*.yaml, which is
@@ -55,6 +55,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             {
                 var sessions = SessionStore.Instance;
                 sessions.Transition += this.OnTransition;
+                sessions.Gone += (_, session) => Beep.OnGone(session);
 
                 // "Which pane am I in" depends on which app is in front; look again when that changes.
                 AppWatcher.Instance.Changed += (_, _) => sessions.Poke();
@@ -77,6 +78,7 @@ namespace Loupedeck.ClaudeDeckPlugin
             Deck.Shutdown();
             AppWatcher.Shutdown();
             SessionStore.Shutdown();
+            Beep.Shutdown();
             UsageStore.Shutdown();
             DeckConfig.Shutdown();
         }
@@ -102,9 +104,7 @@ namespace Loupedeck.ClaudeDeckPlugin
 
                 case "done":
                     // Only a turn that ran long enough for you to have looked away is worth a buzz.
-                    var ran = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - session.TurnSince;
-                    var wasRunning = change.From is "busy" or "attention";
-                    return DeckConfig.HapticDone && wasRunning && session.TurnSince > 0 && ran >= DeckConfig.HapticMinTurnSeconds
+                    return DeckConfig.HapticDone && change.FinishedAfter(DeckConfig.HapticMinTurnSeconds)
                         ? "turnDone"
                         : null;
 
@@ -115,6 +115,8 @@ namespace Loupedeck.ClaudeDeckPlugin
 
         private void OnTransition(Object sender, TransitionEventArgs change)
         {
+            Beep.On(change);
+
             try
             {
                 var haptic = HapticFor(change);
