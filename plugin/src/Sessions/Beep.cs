@@ -6,13 +6,13 @@ namespace Loupedeck.ClaudeDeckPlugin
     using System.Threading;
     using System.Threading.Tasks;
 
-    // The tone your Mac sounds when something stops a session: it is blocked on you, its turn died,
+    // The tone your Mac sounds when a session stops: it is blocked on you, its turn finished or died,
     // or its claude process went away mid-turn. A set number of tones and then quiet - a tap on the
     // shoulder, not an alarm that rings until somebody comes.
     //
     // There is only ever one run of tones. A session stopping while another's are still sounding
     // starts the count again instead of ringing over it, and a session that gets going again takes
-    // its tones with it: answer the prompt after the second tone and there is no third.
+    // its tones with it: answer the prompt after the first tone and there is no second.
     public static class Beep
     {
         private const String Player = "/usr/bin/afplay";
@@ -34,8 +34,8 @@ namespace Loupedeck.ClaudeDeckPlugin
                 "attention" => DeckConfig.BeepAttention,
                 "error" => DeckConfig.BeepError,
 
-                // The haptic's rule: a short turn finishing is one you are still watching.
-                "done" => DeckConfig.BeepDone && change.FinishedAfter(DeckConfig.HapticMinTurnSeconds),
+                // Every turn that ends, unless a shortest one worth hearing about has been set.
+                "done" => DeckConfig.BeepDone && change.FinishedAfter(DeckConfig.BeepMinTurnSeconds),
                 _ => false,
             };
 
@@ -94,7 +94,7 @@ namespace Loupedeck.ClaudeDeckPlugin
         }
 
         // Each tone is started and left to play: afplay takes a second or two to come back even from
-        // a short sound, and waiting for it would turn four brisk tones into a slow march. The beat
+        // a short sound, and waiting for it would turn brisk tones into a slow march. The beat
         // is a timer's, not a pause after each start, so that starting the player - which takes a
         // moment of its own - does not stretch the interval.
         private static async Task Sound()

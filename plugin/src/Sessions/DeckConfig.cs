@@ -91,15 +91,18 @@ namespace Loupedeck.ClaudeDeckPlugin
         // A turn shorter than this finishing is not worth a buzz: you are still looking at it.
         public static Int32 HapticMinTurnSeconds => _current.HapticMinTurnSeconds;
 
-        // Which stops sound the tone: blocked on you, the turn died, the claude process went away
-        // mid-turn - and, only if asked for, a turn simply finishing.
+        // Which stops sound the tone: blocked on you, the turn finished, the turn died, the claude
+        // process went away mid-turn.
         public static Boolean BeepAttention => _current.BeepAttention;
+
+        public static Boolean BeepDone => _current.BeepDone;
 
         public static Boolean BeepError => _current.BeepError;
 
         public static Boolean BeepGone => _current.BeepGone;
 
-        public static Boolean BeepDone => _current.BeepDone;
+        // A turn shorter than this finishing is silent. 0, the default: every turn is heard.
+        public static Int32 BeepMinTurnSeconds => _current.BeepMinTurnSeconds;
 
         // How many tones a stop gets, and how far apart they start.
         public static Int32 BeepTimes => _current.BeepTimes;
@@ -243,10 +246,11 @@ namespace Loupedeck.ClaudeDeckPlugin
             public Boolean HapticError { get; private set; } = true;
             public Int32 HapticMinTurnSeconds { get; private set; } = 20;
             public Boolean BeepAttention { get; private set; } = true;
+            public Boolean BeepDone { get; private set; } = true;
             public Boolean BeepError { get; private set; } = true;
             public Boolean BeepGone { get; private set; } = true;
-            public Boolean BeepDone { get; private set; }
-            public Int32 BeepTimes { get; private set; } = 4;
+            public Int32 BeepMinTurnSeconds { get; private set; }
+            public Int32 BeepTimes { get; private set; } = 2;
             public Int32 BeepEveryMs { get; private set; } = 700;
             public String BeepSound { get; private set; } = "/System/Library/Sounds/Glass.aiff";
             public Double BeepVolume { get; private set; } = 1;
@@ -336,9 +340,13 @@ namespace Loupedeck.ClaudeDeckPlugin
                 if (root.TryGetProperty("beep", out var beep) && beep.ValueKind == JsonValueKind.Object)
                 {
                     s.BeepAttention = Bool(beep, "attention", true);
+                    s.BeepDone = Bool(beep, "done", true);
                     s.BeepError = Bool(beep, "error", true);
                     s.BeepGone = Bool(beep, "gone", true);
-                    s.BeepDone = Bool(beep, "done", false);
+                    if (Number(beep, "minTurnSeconds") is { } shortest && shortest >= 0)
+                    {
+                        s.BeepMinTurnSeconds = (Int32)Math.Min(shortest, 86400);
+                    }
 
                     // Held to what a tap on the shoulder is: a handful of tones, close together.
                     if (Number(beep, "times") is { } times && times >= 0)

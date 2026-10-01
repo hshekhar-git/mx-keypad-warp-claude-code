@@ -2,7 +2,7 @@
 
 Every running [Claude Code](https://claude.com/claude-code) session as a live tile on a **Logitech MX
 Creative Keypad** — jump to it, answer its permission prompts, interrupt it — and, when something
-stops one, four tones from your Mac and a buzz on an **MX Master 4**.
+stops one, [two tones from your Mac](#when-a-session-stops) and a buzz on an **MX Master 4**.
 
 <p align="center"><img src="docs/steps/03-main.png" width="820" alt="An MX Creative Keypad showing an overview of five Claude sessions, the one that needs you next, four live session tiles, and an Allow key with the pending command written on it."></p>
 
@@ -45,8 +45,8 @@ so the page you look at while doing something else is the cockpit, not a menu.
 │    slot 2    │    slot 3    │    slot 4    │
 │  live tile   │  live tile   │  live tile   │
 ├──────────────┼──────────────┼──────────────┤
-│    Claude    │    Allow     │ App Switcher │
-│   Sessions   │              │              │
+│   Sessions   │    Allow     │     Apps     │
+│   (folder)   │              │   (folder)   │
 └──────────────┴──────────────┴──────────────┘
 ```
 
@@ -54,13 +54,13 @@ so the page you look at while doing something else is the cockpit, not a menu.
 |---|---|---|
 | **Overview** | every session as a square in its state colour, under a headline for the most urgent thing: `1 needs you` → `2 errored` → `1 at limit` → `2 your turn` → `3 working`. The white-edged square is the session the keys act on | walks the sessions that want you, most urgent first |
 | **Next** | the *one* session that most deserves you, as a full live tile - the command it wants to run, the question it asked, `limit · 4:40am` - headed `NEXT · 1 of 3`. When nothing wants you: `all clear · 2 working` | goes to it. Dealing with it is what moves the queue on |
-| **Session slot 1-8** | your sessions *on the main page*: slot 3 is the third session, in the same stable order as the list (Warp window, tab, pane), so a session keeps its key for as long as it lives | jumps to its pane - which also makes it the target of **Model**, **Effort**, **Permission mode** and **Allow**. **Hold** to interrupt it |
+| **Session slot 1-8** | your sessions *on the main page*: slot 3 is the third session, in the same stable order as the list (Warp window, tab, pane), so a session keeps its key for as long as it lives | jumps to its pane - which also makes it the target of **Model**, **Effort** and **Permission mode**. **Hold** to interrupt it |
 
 The queue behind *Overview* and *Next*: blocked on you (longest first), then errored, then out of
 usage, then finished (longest ago first). Working and idle sessions want nothing, so they are not in it.
 
-Slots and the folder are the same sessions at two depths: a slot is one press to the pane; **Claude
-Sessions** is where a session's own page lives (info, model, effort, mode, answers).
+Slots and the folder are the same sessions at two depths: a slot is one press to the pane;
+**Sessions** is where a session's own page lives (info, model, effort, mode, answers).
 
 ## Plan usage on the keypad
 
@@ -146,7 +146,8 @@ the name - `web-app needs you` - when another session is blocked on you (`2 need
 turns **green** with `2 your turn` when others have finished, and otherwise just counts them. Along
 its bottom edge is one dot per other session in its state colour, so the whole deck is readable
 without leaving the page. **Press** it for the list; **hold** it to skip the list and land directly on
-whichever session needs you most (blocked longest, else errored, else finished longest ago).
+whichever session needs you most (blocked longest, else errored, else out of usage, else finished
+longest ago).
 
 **Out of usage** - when a session hits your usage limit its tile turns **amber** and reads
 `limit · 4:40am` (when it lifts), and its page gains a **continue at low priority** key, which sends
@@ -202,13 +203,13 @@ limited; any later reply, or the reset time passing, means not.
 ▂▃▅▇▅▃▂▁▂▃▅▆▅▃  ← a wave of block characters flowing past while it works
 ```
 
-**The tiles move.** Everything animated is drawn from characters, four frames a second:
+**The tiles move.** The marks are drawn from characters, four frames a second:
 
 | When | What you see |
 |---|---|
-| working | a half-filled circle turning beside the status - `◐ ◓ ◑ ◒` - and two sine waves of `▁▂▃▄▅▆▇█` sliding past each other along the bottom edge |
+| working | a half-filled circle turning beside the status - `◐ ◓ ◑ ◒` - two sine waves of `▁▂▃▄▅▆▇█` sliding past each other along the bottom edge, and the tile's colour swelling and settling like a breath |
 | blocked on you | the tile blinks and arrows close in on the question: `>  allow Bash?  <` → `> allow Bash? <` → `>allow Bash?<` |
-| a turn just finished | three seconds of a twinkling diamond - `◇ ◆` - then it settles to `✓ done 0:03` |
+| a turn just finished | three seconds of a twinkling diamond - `◇ ◆` - then it settles to `✓ done 3s` |
 | tapping model / effort / mode | a bar runs down - `[======]` → `[===---]` → `[=-----]` - showing how long until your taps are taken as final |
 | nothing to show | `\(^_^)/ all clear`, `(-_-) zzZ no sessions`, `[   ]` for an empty slot |
 
@@ -227,6 +228,35 @@ braille beside text. Animation only runs for tiles that are actually moving. `"s
 | amber | **limit** — out of usage until the time shown | the transcript's `rate_limit` reply |
 | grey | **idle** - with a short model tag, as on finished tiles: `idle · F5.1` | `SessionStart` |
 
+## When a session stops
+
+You do not have to be looking at the keypad to know.
+
+**A tone** — your Mac sounds *Glass* twice, 0.7 s apart, and then stays quiet: a tap on the
+shoulder, not an alarm that rings until somebody comes. It needs no mouse and no setup. Four things
+count as a stop:
+
+| Stop | What happened | Setting |
+|---|---|---|
+| **blocked on you** | a permission prompt, a question, a plan waiting for approval | `attention` |
+| **the turn finished** | Claude is done, and it is your move | `done` |
+| **the turn died** | an API error, or your usage limit | `error` |
+| **the process went away** | `claude` crashed or was killed mid-turn. Its tile simply vanishes, so the tone is the only sign | `gone` |
+
+- Every turn that finishes sounds, however short. `"minTurnSeconds": 20` keeps quick replies quiet -
+  a turn shorter than that finishes in silence - and `"done": false` leaves finishing out altogether.
+- Quitting a session yourself is not a stop: Claude Code says goodbye first.
+- There is one run of tones at a time. A second session stopping while the first is still sounding
+  starts the count again instead of ringing over it.
+- The tones stop early if the session gets going again - answer the prompt after the first tone
+  and there is no second.
+- Which stops, how many tones, how far apart, which sound and how loud are all under `beep` in the
+  [config](#configuration): `"times": 4` for four tones, `"sound": "Ping"` for another of the Mac's
+  alert sounds, `"times": 0` for none at all.
+
+**A buzz (MX Master 4)** — three haptic events, remappable in Options+: *Claude needs you* (`knock`),
+*Claude finished* (`completed`, only for turns longer than 20 s), *Claude errored* (`angry_alert`).
+
 ## App Switcher
 
 A Cmd-Tab you can see. Put **Apps** on one key; press it and every running app is a key with
@@ -244,9 +274,9 @@ quits, activates or hides - nothing polls - and exits by itself when the plugin 
 
 ## Model switch
 
-**Model** is a live key: it shows which model the target session is set to - `Fable 5.1`, with
-`1M context` underneath when it is on the big window - in that model's colour, and the project it
-belongs to. Resting tiles carry the same thing as a short tag: `done 5:12 · F5.1`.
+**Model** is a live key: it shows which model the target session is set to - `Fable 5.1`, in that
+model's colour, under the name of the project it belongs to, with `model · 1M` beneath when it is on
+the big window. Resting tiles carry the same thing as a short tag: `done 5:12 · F5.1`.
 
 **Tap to change it.** Each tap steps to the next model in your list, ringed in white; the switch is
 sent once, about a second and a half after your last tap. So Fable → Sonnet, passing Opus, is *one*
@@ -275,7 +305,7 @@ without opening it.
 | Key | Shows | Press |
 |---|---|---|
 | **Overview**, **Next**, **Session slot 1-8** | see [The main page](#the-main-page) | |
-| **Usage: session / weekly / pace** | see [Plan usage on the keypad](#plan-usage-on-the-keypad) | nothing - they are gauges |
+| **Usage: session (5h)**, **Usage: weekly**, **Usage: pace / model** | see [Plan usage on the keypad](#plan-usage-on-the-keypad) | nothing - they are gauges |
 | **Needs me** | one number: the size of the most urgent group that has anyone in it - blocked on you, else errored, else at the usage limit, else finished - in that group's colour and under its name. With nobody waiting: how many are working | walks exactly the sessions it is counting, longest-waiting first |
 | **Working** | how many are still running | walks them |
 | **Allow** | the oldest open permission prompt *spelled out*: tool, command, project | **allows it**. **Hold** to go and look instead |
@@ -287,28 +317,8 @@ without opening it.
 | **Apps**, **Open App** | see [App Switcher](#app-switcher) | |
 | **Models** | a folder: every configured model, the one in use marked | sets it - see [Model switch](#model-switch) |
 
-**Haptics (MX Master 4)** — three events, remappable in Options+: *Claude needs you* (`knock`),
-*Claude finished* (`completed`, only for turns longer than 20 s), *Claude errored* (`angry_alert`).
-
-**A tone when something stops a session** — your Mac sounds *Glass* four times, 0.7 s apart, and
-then stays quiet: a tap on the shoulder, not an alarm that rings until somebody comes. It needs no
-mouse and no setup. Three things count as a stop:
-
-| Stop | What happened | Setting |
-|---|---|---|
-| **blocked on you** | a permission prompt, a question, a plan waiting for approval | `attention` |
-| **the turn died** | an API error, or your usage limit | `error` |
-| **the process went away** | `claude` crashed or was killed mid-turn. Its tile simply vanishes, so the tone is the only sign | `gone` |
-
-- A turn finishing by itself is not a stop, and is silent. `"done": true` makes it sound too, for
-  turns longer than `minTurnSeconds`.
-- Quitting a session yourself is not a stop either: Claude Code says goodbye first.
-- There is one run of tones at a time. A second session stopping while the first is still sounding
-  starts the count again instead of ringing over it.
-- The tones stop early if the session gets going again - answer the prompt after the second tone
-  and there is no third.
-- Which stops, how many tones, how far apart, which sound and how loud are all under `beep` in the
-  [config](#configuration). `"times": 0` turns it off.
+A stopped session also sounds a tone and buzzes an MX Master 4 - see
+[When a session stops](#when-a-session-stops).
 
 ### Safety of the typing keys
 
@@ -380,6 +390,7 @@ Open **Logi Options+ → MX Creative Keypad**. In the actions panel find the plu
 | *optional:* **Needs me**, **Working** | Claude | the plain counts, if you prefer numbers |
 | *optional:* **Model**, **Effort**, **Permission mode** | Claude | home page - the same controls as on a session's page, for the target session |
 | *optional:* **Models** | Claude | a folder: pick a model from a list instead of tapping through |
+| *optional:* **Usage: session (5h)**, **Usage: weekly**, **Usage: pace / model** | Usage | home page - the plan gauges, without opening **Sessions** |
 | *optional:* **Open App** | Apps | a direct "go to Warp" key: type `Warp` in its form |
 | *optional:* anything under **Commands**, or **Send to Claude** | Commands / Claude | home page |
 
@@ -406,12 +417,12 @@ waveform there.
    above the three usage keys.
 3. Send a prompt. The tile turns **coral**, a half-circle turns beside the tool it is using, and a
    wave flows along its bottom edge.
-4. When Claude finishes it turns **green**; on your home page *Overview* reads `1 your turn` and
-   *Next* shows that session.
+4. When Claude finishes it turns **green** and your Mac sounds two tones; on your home page
+   *Overview* reads `1 your turn` and *Next* shows that session.
 5. Click into another app, press **Apps**, press **Warp** - Warp comes forward and the folder
    closes.
 6. Ask Claude to run something it needs permission for (`run ls in /tmp`). The tile blinks **red** and
-   shows the command, and your Mac sounds four tones. Press the tile to open that session's page:
+   shows the command, and the two tones sound again. Press the tile to open that session's page:
    **yes / always / no** are the keys right after it. (*Allow* on the home page shows the same prompt
    and approves it in one press.)
 7. On that page, tap **effort** a couple of times and stop: about a second and a half later
@@ -470,7 +481,7 @@ actions work on every profile.
 | Folder shows **No sessions** while Claude is running | That session started before the hooks were installed - start a new one. Also confirm `jq` exists: the hook exits silently without it |
 | Tiles work, but `esc` / `yes` / `/compact` do nothing | Accessibility permission (Step 4). After an Options+ update macOS sometimes drops it: toggle the entry off and on |
 | A key types nothing and the log says `... is in front, not ...` | Working as designed: typing keys refuse unless the expected terminal is frontmost. Press the session tile first |
-| App Switcher shows **No apps** | The helper is not running: `pgrep -fl deck-apps`. Rebuild with `./install.sh`; the log says why if it cannot start |
+| **Apps** shows **No apps** | The helper is not running: `pgrep -fl deck-apps`. Rebuild with `./install.sh`; the log says why if it cannot start |
 | All Warp sessions land on one page | Warp changed its internal database layout. Status and focus still work; only per-tab paging is lost. Please open an issue |
 | **Model** shows `?` | No reply has been written in that session yet and no `/model` switch was made, so there is nothing to read. It fills in after the first turn |
 | A model switch types `/model x` but Claude Code rejects it | That alias is not one your Claude Code version knows. Put the full model id in `alias` in `config.json` |
@@ -478,7 +489,7 @@ actions work on every profile.
 | Usage keys are grey with `35m old` | No session has talked to the API for that long; the numbers refresh on the next reply |
 | Usage differs from the usage page | The keys show what Claude Code derives from the rate-limit headers of its latest API response; the page is computed server-side and can disagree. Compare with `/usage` inside Claude Code |
 | No buzz on the MX Master 4 | Step 5, and check `"haptics"` in `~/.claude/deck/config.json`. *Claude finished* only fires for turns longer than `minTurnSeconds` (20) |
-| No tone when a session stops | Check `"beep"` in `~/.claude/deck/config.json` - `times` above 0, and the stop you expect not set to `false` - and that the Mac is not muted. The log has a line for every run of tones (`web-app stopped (attention): 4 tone(s)`) and names a `sound` it could not find. A turn finishing is silent unless `"done": true` |
+| No tone when a session stops | Check `"beep"` in `~/.claude/deck/config.json` - `times` above 0, and the stop you expect not set to `false` - and that the Mac is not muted. The log has a line for every run of tones (`web-app stopped (done): 2 tone(s)`) and names a `sound` it could not find. With `minTurnSeconds` set, a turn shorter than that finishes in silence |
 
 ## Configuration
 
@@ -493,12 +504,12 @@ annotated version; the installer seeds your copy from it.
 | `showContext` | the context-window gauge along the top of each tile |
 | `contextWindow`, `contextWindows` | the window size the gauge is measured against, when Claude Code has not said (it usually has - see [Plan usage](#plan-usage-on-the-keypad)) |
 | `haptics` | `attention` / `done` / `error` on or off, and `minTurnSeconds`: a turn shorter than this finishing is not announced |
-| `beep` | the tone when something stops a session. `attention` / `error` / `gone` / `done`: which stops sound it · `times`: how many tones (4; 0 is off) · `every`: seconds between them (0.7) · `sound`: a macOS alert sound by name (`Glass`, `Ping`, `Hero`, ...) or the path of an audio file · `volume`: 1 is as recorded |
+| `beep` | the tone when a session stops. `attention` / `done` / `error` / `gone`: which stops sound it · `minTurnSeconds`: a turn shorter than this finishing is silent (0: every turn sounds) · `times`: how many tones (2; 0 is off) · `every`: seconds between them (0.7) · `sound`: a macOS alert sound by name (`Glass`, `Ping`, `Hero`, ...) or the path of an audio file · `volume`: 1 is as recorded |
 | `sessions` | `group`: `"flat"` or `"tab"` (one page per Warp tab) · `focusOnOpen`: opening a session also brings its pane forward · `usageRow`: the three usage keys under the list · `pageUsageRow`: and under a session's page |
 | `usage` | `perModel`: ask Claude Code (`claude -p /usage`) for the per-model weekly window while a usage key is showing · `claudePath`: where `claude` is, if not in `~/.local/bin`, `/opt/homebrew/bin` or `/usr/local/bin` |
 | `models` | what **Model** steps through and **Models** lists: `alias` (typed after `/model`), `label`, `match`, `color` |
 | `apps` | the App Switcher: `pinned` and `hidden` bundle ids, `order` (`recent` / `launch` / `name`), `closeOnSwitch` |
-| `keys` | the command keys on every session's page, also published under **Commands** for your home page: `label`, `text`, `submit`, `key` (`"escape"`), `color`, and an optional `id` |
+| `keys` | the command keys on every session's page - the first three are its bottom row - also published under **Commands** for your home page: `label`, `text`, `submit`, `key` (`"escape"`), `color`, `icon`, and an optional `id` |
 
 A key you have placed from **Commands** is remembered by its `id` - or, without one, by what it
 *does* (its text, whether it submits, the special key it sends). So relabelling or reordering keys

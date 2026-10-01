@@ -23,12 +23,13 @@
   // A turn shorter than minTurnSeconds finishing is not announced - you are still watching it.
   "haptics": { "attention": true, "done": true, "error": true, "minTurnSeconds": 20 },
 
-  // A tone from your Mac when something stops a session: `times` of them, and then quiet.
+  // A tone from your Mac when a session stops: `times` of them, and then quiet.
   //   attention  it is blocked on you - a permission prompt, a question, a plan
+  //   done       its turn finished, and it is your move
   //   error      its turn died - an API error, or your usage limit
   //   gone       its claude process went away mid-turn - crashed, or killed
-  //   done       a turn simply finishing. Off, because nothing stopped it; when on, a turn shorter
-  //              than haptics.minTurnSeconds still finishes in silence
+  //   minTurnSeconds  a turn shorter than this finishing is silent. 0: every turn sounds; 20 keeps
+  //              quick replies quiet, as the haptics do
   //   times      how many tones a stop gets, up to 20; 0 for none at all
   //   every      seconds from the start of one tone to the start of the next, 0.2 to 10
   //   sound      a macOS alert sound by name - Glass, Ping, Hero, Funk, Sosumi, Submarine, Morse,
@@ -37,10 +38,10 @@
   //   volume     1 plays the sound as recorded; 0.5 is quieter, 2 louder, 4 the most
   // A second session stopping while the tones are still sounding starts the count again rather than
   // ringing over them, and they stop early if the session gets going again.
-  "beep": { "attention": true, "error": true, "gone": true, "done": false, "times": 4, "every": 0.7, "sound": "Glass", "volume": 1 },
+  "beep": { "attention": true, "done": true, "error": true, "gone": true, "minTurnSeconds": 0, "times": 2, "every": 0.7, "sound": "Glass", "volume": 1 },
 
   // The Sessions folder.
-  //   group        "flat" - every session in one list, eight to a page
+  //   group        "flat" - every session in one list
   //                "tab"  - one page per Warp tab
   //   focusOnOpen  pressing a session also brings its pane to the front (false: just open its page)
   //   usageRow     keep the list's bottom three keys for plan usage (session, weekly, and a model's
@@ -82,8 +83,9 @@
     "closeOnSwitch": true
   },
 
-  // The command keys on every session's page, after its info and settings. Max 7; the first two fit
-  // on the page's first screen, the rest are one press of the right arrow away.
+  // The command keys on every session's page, after its info and settings. Up to 12: the first three
+  // are the page's bottom row - where the answers go while the session is blocked - and the rest are
+  // on its next page.
   //   text    typed exactly as written (a trailing space is kept)
   //   submit  press Return afterwards. Off is for something you finish by hand: "/compact " with a
   //           trailing space and no submit lets you add your own instructions before sending

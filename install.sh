@@ -168,7 +168,7 @@ $(bold "Installed. Three things only you can do:")
 
   1. Put the keys on your keypad
      Logi Options+  ->  MX Creative Keypad  ->  find "MX Keypad Warp Claude Code" in the action list
-     Drag onto keys:  Overview, Next, Session slot 1-4, Claude Sessions, Allow, App Switcher
+     Drag onto keys:  Overview, Next, Session slot 1-4, Sessions, Allow, Apps
 
   2. Allow typing (only needed for esc, /compact, yes / always / no ...)
      System Settings -> Privacy & Security -> Accessibility -> enable "Logi Plugin Service"
@@ -177,6 +177,6 @@ $(bold "Installed. Three things only you can do:")
      coral then green. Sessions that were already running appear on their next tool call.
 
   MX Master 4 haptics:  Logi Options+ -> MX Master 4 -> Haptic feedback -> enable this plugin.
-  A stopped session:    sounds four tones on this Mac - tune or silence it under "beep" in ~/.claude/deck/config.json
+  A stopped session:    sounds two tones on this Mac - tune or silence it under "beep" in ~/.claude/deck/config.json
   Something off?        see "Troubleshooting" in README.md
 EOF
